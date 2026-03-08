@@ -132,9 +132,6 @@ Format docs:
 bunx prettier --write "**/*.md"
 ```
 
-## Docs
+## License
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Testing](docs/TESTING.md)
-- [Go conventions](docs/GO.md)
-- [Output rules](docs/OUTPUT.md)
+[MIT](LICENSE)
