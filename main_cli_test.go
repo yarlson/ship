@@ -37,47 +37,35 @@ func TestMain(m *testing.M) {
 func TestShip_Help_PrintsUsage(t *testing.T) {
 	cmd := exec.CommandContext(context.Background(), binaryPath, "--help")
 	out, err := cmd.Output()
-	require.NoError(t, err, "exit code should be 0 for --help")
+	require.NoError(t, err)
 
 	stdout := string(out)
-	assert.Contains(t, stdout, "ship — build, transfer, and deploy Docker Compose images to a remote host")
-	assert.Contains(t, stdout, "--docker-compose")
-	assert.Contains(t, stdout, "--user")
-	assert.Contains(t, stdout, "--host")
-	assert.Contains(t, stdout, "--key")
-	assert.Contains(t, stdout, "--command")
-	assert.Contains(t, stdout, "Examples:")
+	assert.Contains(t, stdout, "ship — transfer a local Docker image to a remote host over SSH")
+	assert.Contains(t, stdout, "<user@host> <image[:tag]>")
+	assert.Contains(t, stdout, "-i, --identity-file")
+	assert.Contains(t, stdout, "-p, --port")
 }
 
-func TestShip_NoFlags_PrintsMissingFlagsError(t *testing.T) {
+func TestShip_NoArgs_PrintsMissingArgumentsError(t *testing.T) {
 	cmd := exec.CommandContext(context.Background(), binaryPath)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 
-	require.Error(t, err, "exit code should be non-zero")
+	require.Error(t, err)
 	errOut := stderr.String()
-	assert.Contains(t, errOut, "Error: Missing required flags:")
-	assert.Contains(t, errOut, "--docker-compose")
-	assert.Contains(t, errOut, "--user")
-	assert.Contains(t, errOut, "--host")
-	assert.Contains(t, errOut, "--key")
-	assert.Contains(t, errOut, "--command")
+	assert.Contains(t, errOut, "Error: missing required arguments:")
+	assert.Contains(t, errOut, "<user@host>")
+	assert.Contains(t, errOut, "<image[:tag]>")
 	assert.Contains(t, errOut, "Usage: ship")
 }
 
-func TestShip_PartialFlags_ListsMissingOnes(t *testing.T) {
-	cmd := exec.CommandContext(context.Background(), binaryPath, "--host", "example.com", "--user", "deploy")
+func TestShip_OnlyTarget_PrintsMissingImageError(t *testing.T) {
+	cmd := exec.CommandContext(context.Background(), binaryPath, "deploy@example.com")
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 
-	require.Error(t, err, "exit code should be non-zero")
-	errOut := stderr.String()
-	assert.Contains(t, errOut, "--docker-compose")
-	assert.Contains(t, errOut, "--key")
-	assert.Contains(t, errOut, "--command")
-	// Should not list the flags that were provided.
-	assert.NotContains(t, errOut, "--host,")
-	assert.NotContains(t, errOut, "--user,")
+	require.Error(t, err)
+	assert.Contains(t, stderr.String(), "missing required arguments: <image[:tag]>")
 }

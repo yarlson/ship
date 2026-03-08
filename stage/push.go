@@ -7,19 +7,14 @@ import (
 	"ship/progress"
 )
 
-// Push executes Stage 4: push all transfer-tagged images to the local registry.
-// imageMap maps original image ref → localhost:5001/ transfer tag.
-func Push(imageMap map[string]string) error {
-	progress.StageStart(4, "Pushing images to local registry")
+// Push executes Stage 3: push the transfer-tagged image to the local registry.
+func Push(transfer string) error {
+	progress.StageStart(3, "Pushing image to local registry")
 
-	count := 0
-	for _, transfer := range imageMap {
-		if err := docker.PushImage(transfer); err != nil {
-			return fmt.Errorf("Failed to push %s — %w", transfer, err) //nolint:staticcheck // user-facing message per DESIGN.md spec
-		}
-		count++
+	if err := docker.PushImage(transfer); err != nil {
+		return fmt.Errorf("failed to push %s — %w", transfer, err)
 	}
 
-	progress.StageComplete(4, fmt.Sprintf("Push complete (%d images)", count))
+	progress.StageComplete(3, "Push complete")
 	return nil
 }

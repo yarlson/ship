@@ -19,23 +19,23 @@ func captureOutput(fn func()) string {
 
 func TestStageStart_Format(t *testing.T) {
 	out := captureOutput(func() {
-		StageStart(1, "Building images")
+		StageStart(1, "Tagging image for transfer")
 	})
 
-	assert.Equal(t, "[1/7] Building images...\n", out)
+	assert.Equal(t, "[1/5] Tagging image for transfer...\n", out)
 }
 
 func TestStageComplete_Format(t *testing.T) {
 	out := captureOutput(func() {
-		StageComplete(3, "Registry ready")
+		StageComplete(2, "Registry ready")
 	})
 
-	assert.Equal(t, "[3/7] Registry ready\n", out)
+	assert.Equal(t, "[2/5] Registry ready\n", out)
 }
 
 func TestStageStart_NoANSI(t *testing.T) {
 	out := captureOutput(func() {
-		StageStart(1, "Building images")
+		StageStart(1, "Tagging image for transfer")
 	})
 
 	ansi := regexp.MustCompile(`\x1b\[`)
@@ -44,7 +44,7 @@ func TestStageStart_NoANSI(t *testing.T) {
 
 func TestStageComplete_NoEmoji(t *testing.T) {
 	out := captureOutput(func() {
-		StageComplete(7, "Command complete")
+		StageComplete(5, "Pull and restore complete")
 	})
 
 	// Check for common emoji Unicode ranges.
@@ -52,18 +52,18 @@ func TestStageComplete_NoEmoji(t *testing.T) {
 	assert.False(t, emoji.MatchString(out), "output contains emoji")
 }
 
-func TestStageStart_AllSevenNumbers(t *testing.T) {
-	for i := 1; i <= 7; i++ {
+func TestStageStart_AllFiveNumbers(t *testing.T) {
+	for i := 1; i <= 5; i++ {
 		out := captureOutput(func() {
 			StageStart(i, "Test")
 		})
-		assert.Contains(t, out, "["+string(rune('0'+i))+"/7]")
+		assert.Contains(t, out, "["+string(rune('0'+i))+"/5]")
 	}
 }
 
 func TestProgress_NoBlankLines(t *testing.T) {
 	out := captureOutput(func() {
-		for i := 1; i <= 7; i++ {
+		for i := 1; i <= 5; i++ {
 			StageStart(i, "Start")
 			StageComplete(i, "Done")
 		}

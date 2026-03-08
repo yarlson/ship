@@ -14,7 +14,7 @@ import (
 func TestRunRemoteCommand_Success(t *testing.T) {
 	cfg := testenv.RequireE2EConfig(t)
 
-	stdout, _, exitCode, err := RunRemoteCommand(cfg.KeyPath, cfg.User, cfg.Host, "echo hello")
+	stdout, _, exitCode, err := RunRemoteCommand(cfg.KeyPath, 22, cfg.User, cfg.Host, "echo hello")
 	require.NoError(t, err)
 	assert.Equal(t, 0, exitCode)
 	assert.Equal(t, "hello\n", stdout)
@@ -23,7 +23,7 @@ func TestRunRemoteCommand_Success(t *testing.T) {
 func TestRunRemoteCommand_NonZeroExit(t *testing.T) {
 	cfg := testenv.RequireE2EConfig(t)
 
-	_, _, exitCode, err := RunRemoteCommand(cfg.KeyPath, cfg.User, cfg.Host, "exit 42")
+	_, _, exitCode, err := RunRemoteCommand(cfg.KeyPath, 22, cfg.User, cfg.Host, "exit 42")
 	require.Error(t, err)
 	assert.Equal(t, 42, exitCode)
 }
@@ -31,7 +31,7 @@ func TestRunRemoteCommand_NonZeroExit(t *testing.T) {
 func TestRunRemoteCommand_StderrCapture(t *testing.T) {
 	cfg := testenv.RequireE2EConfig(t)
 
-	_, stderr, _, err := RunRemoteCommand(cfg.KeyPath, cfg.User, cfg.Host, "echo err >&2")
+	_, stderr, _, err := RunRemoteCommand(cfg.KeyPath, 22, cfg.User, cfg.Host, "echo err >&2")
 	require.NoError(t, err)
 	assert.Equal(t, "err\n", stderr)
 }
@@ -39,7 +39,7 @@ func TestRunRemoteCommand_StderrCapture(t *testing.T) {
 func TestStartTunnel_ProcessAlive(t *testing.T) {
 	cfg := testenv.RequireE2EConfig(t)
 
-	tp, err := StartTunnel(cfg.KeyPath, cfg.User, cfg.Host)
+	tp, err := StartTunnel(cfg.KeyPath, 22, cfg.User, cfg.Host)
 	require.NoError(t, err)
 	require.NotNil(t, tp)
 	t.Cleanup(func() {
@@ -58,7 +58,7 @@ func TestStartTunnel_ProcessAlive(t *testing.T) {
 func TestStopTunnel_Cleanup(t *testing.T) {
 	cfg := testenv.RequireE2EConfig(t)
 
-	tp, err := StartTunnel(cfg.KeyPath, cfg.User, cfg.Host)
+	tp, err := StartTunnel(cfg.KeyPath, 22, cfg.User, cfg.Host)
 	require.NoError(t, err)
 
 	err = StopTunnel(tp)

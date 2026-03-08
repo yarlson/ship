@@ -30,7 +30,7 @@ func testSSHConfig(t *testing.T) cli.Config {
 		User:    cfg.User,
 		Host:    cfg.Host,
 		KeyPath: cfg.KeyPath,
-		Command: "echo test",
+		Port:    22,
 	}
 }
 

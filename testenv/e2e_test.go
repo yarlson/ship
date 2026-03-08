@@ -29,5 +29,5 @@ func TestLoadE2EConfigFromEnv_MissingVars(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "SHIP_E2E_USER")
 	assert.Contains(t, err.Error(), "SHIP_E2E_HOST")
-	assert.Contains(t, err.Error(), "SHIP_E2E_KEY")
+	assert.NotContains(t, err.Error(), "SHIP_E2E_KEY")
 }

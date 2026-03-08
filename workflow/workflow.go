@@ -2,10 +2,9 @@ package workflow
 
 import (
 	"fmt"
-	"sort"
-	"strings"
 
 	"ship/cli"
+	"ship/docker"
 	"ship/progress"
 	"ship/ssh"
 	"ship/stage"
@@ -13,56 +12,43 @@ import (
 
 // State holds shared mutable state passed through stages.
 type State struct {
-	ImageMap  map[string]string
-	TunnelCmd *ssh.TunnelProcess
+	OriginalImage string
+	TransferImage string
+	TunnelCmd     *ssh.TunnelProcess
 }
 
-// Run executes preflight checks followed by the 7-stage workflow.
+// Run executes preflight checks followed by the 5-stage workflow.
 func Run(cfg cli.Config) error {
 	if err := Preflight(cfg); err != nil {
 		return err
 	}
 
-	state := &State{}
-
-	// Stage 1: Build
-	imageMap, err := stage.Build(cfg.ComposeFiles)
-	if err != nil {
-		return wrapStageErr(1, "Build", err)
-	}
-	state.ImageMap = imageMap
-
-	// Stage 2: Tag
-	if err := stage.Tag(imageMap); err != nil {
-		return wrapStageErr(2, "Tag", err)
+	state := &State{
+		OriginalImage: cfg.Image,
+		TransferImage: docker.TransferTag(cfg.Image),
 	}
 
-	// Stage 3: Registry
+	if err := stage.Tag(state.OriginalImage, state.TransferImage); err != nil {
+		return wrapStageErr(1, "Tag", err)
+	}
+
 	if err := stage.Registry(); err != nil {
-		return wrapStageErr(3, "Registry", err)
+		return wrapStageErr(2, "Registry", err)
 	}
 
-	// Stage 4: Push
-	if err := stage.Push(imageMap); err != nil {
-		return wrapStageErr(4, "Push", err)
+	if err := stage.Push(state.TransferImage); err != nil {
+		return wrapStageErr(3, "Push", err)
 	}
 
-	// Stage 5: Tunnel
 	tp, err := stage.Tunnel(cfg)
 	if err != nil {
-		return wrapStageErr(5, "Tunnel", err)
+		return wrapStageErr(4, "Tunnel", err)
 	}
 	state.TunnelCmd = tp
 	defer cleanupTunnel(state)
 
-	// Stage 6: Pull & Restore
-	if err := stage.Pull(cfg, imageMap); err != nil {
-		return wrapStageErr(6, "Pull", err)
-	}
-
-	// Stage 7: Command
-	if err := stage.Command(cfg); err != nil {
-		return wrapStageErr(7, "Command", err)
+	if err := stage.Pull(cfg, state.OriginalImage, state.TransferImage); err != nil {
+		return wrapStageErr(5, "Pull", err)
 	}
 
 	printSummary(cfg, state)
@@ -80,16 +66,9 @@ func wrapStageErr(stageNum int, name string, err error) *StageError {
 
 // printSummary prints the success summary block to stdout.
 func printSummary(cfg cli.Config, state *State) {
-	names := make([]string, 0, len(state.ImageMap))
-	for original := range state.ImageMap {
-		names = append(names, original)
-	}
-	sort.Strings(names)
-
 	fmt.Fprintln(progress.Writer, "Ship complete")
 	fmt.Fprintf(progress.Writer, "  Host:     %s\n", cfg.Host)
-	fmt.Fprintf(progress.Writer, "  Images:   %s\n", strings.Join(names, ", "))
-	fmt.Fprintf(progress.Writer, "  Command:  %s\n", cfg.Command)
+	fmt.Fprintf(progress.Writer, "  Image:    %s\n", state.OriginalImage)
 	fmt.Fprintln(progress.Writer, "  Status:   Success")
 }
 

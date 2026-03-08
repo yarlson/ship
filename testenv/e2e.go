@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -36,9 +37,6 @@ func LoadE2EConfigFromEnv() (E2EConfig, error) {
 	if cfg.Host == "" {
 		missing = append(missing, "SHIP_E2E_HOST")
 	}
-	if cfg.KeyPath == "" {
-		missing = append(missing, "SHIP_E2E_KEY")
-	}
 	if len(missing) > 0 {
 		return E2EConfig{}, fmt.Errorf("missing E2E test configuration: set %s", strings.Join(missing, ", "))
 	}
@@ -61,18 +59,25 @@ func RequireE2EConfig(t *testing.T) E2EConfig {
 		t.Skipf("skipping e2e test: Docker daemon unavailable: %v", err)
 	}
 
-	if _, err := os.Stat(cfg.KeyPath); err != nil {
-		t.Skipf("skipping e2e test: SSH key unavailable: %v", err)
+	if cfg.KeyPath != "" {
+		if _, err := os.Stat(cfg.KeyPath); err != nil {
+			t.Skipf("skipping e2e test: SSH key unavailable: %v", err)
+		}
 	}
 
-	sshCmd := exec.CommandContext(context.Background(), "ssh",
-		"-i", cfg.KeyPath,
-		"-o", "ConnectTimeout=5",
-		"-o", "StrictHostKeyChecking=accept-new",
+	args := []string{}
+	if cfg.KeyPath != "" {
+		args = append(args, "-i", cfg.KeyPath)
+	}
+	args = append(args,
+		"-p", strconv.Itoa(22),
+		"-o", "StrictHostKeyChecking=no",
 		"-o", "BatchMode=yes",
+		"-o", "ConnectTimeout=5",
 		cfg.Address(),
 		"true",
 	)
+	sshCmd := exec.CommandContext(context.Background(), "ssh", args...)
 	if err := sshCmd.Run(); err != nil {
 		t.Skipf("skipping e2e test: SSH test host unavailable: %v", err)
 	}

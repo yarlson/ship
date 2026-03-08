@@ -1,44 +1,24 @@
-# Context Map — Documentation Index
+# Context Map
 
 ## Core Files
 
-- `summary.md` — Project overview: What, Architecture, Core Flow, System State, Capabilities, Tech Stack
-- `terminology.md` — Term definitions (Config, stage, local registry, etc.)
-- `practices.md` — Conventions and invariants (code quality, testing, CLI, secrets)
+- `summary.md` — current product shape, workflow, capabilities
+- `terminology.md` — key terms used in the codebase and docs
+- `practices.md` — coding, testing, and workflow conventions
 
-## Domain Documentation
+## Domain Docs
 
-### CLI Domain
+- `cli/parsing.md` — SSH-style CLI parsing and validation
+- `workflow/stages.md` — 5-stage transfer pipeline
+- `workflow/validation.md` — preflight checks and failure behavior
+- `docker/image-handling.md` — local image inspection, tagging, registry push helpers
+- `stage/implementation.md` — stage responsibilities and signatures
+- `ssh/tunnel-management.md` — reverse tunnel lifecycle and remote Docker commands
+- `progress/output.md` — `[N/5]` progress output contract
 
-- `cli/parsing.md` — Flag parsing, validation, error handling
+## Related Docs
 
-### Workflow Domain
-
-- `workflow/stages.md` — 7-stage pipeline definition and flow
-- `workflow/validation.md` — Preflight validation checks and StageError error handling
-
-### Docker Domain
-
-- `docker/image-handling.md` — Docker CLI operations and image metadata parsing
-
-### Stage Domain
-
-- `stage/implementation.md` — Stage 1-7 implementations, data flow, and integration patterns
-
-### SSH Domain
-
-- `ssh/tunnel-management.md` — SSH tunnel lifecycle, remote command execution, process management
-
-### Progress Domain
-
-- `progress/output.md` — Progress reporting format and testability
-
----
-
-## Related Project Documentation
-
-- `CLAUDE.md` — Project principles (DRY, KISS, SOLID, TDD, CLI-based, fail-fast)
-- `docs/ARCHITECTURE.md` — Module boundaries, data flow, design decisions
-- `docs/GO.md` — Go conventions, error handling, testing patterns
-- `docs/TESTING.md` — Testing strategy and test tiers
-- `docs/OUTPUT.md` — User-facing message and error format rules
+- `docs/ARCHITECTURE.md` — module map and data flow
+- `docs/GO.md` — Go style and testing conventions
+- `docs/TESTING.md` — test tiers and commands
+- `docs/OUTPUT.md` — user-facing output rules

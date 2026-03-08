@@ -9,119 +9,70 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParse_AllFlagsPresent(t *testing.T) {
-	args := []string{
-		"--docker-compose", "compose.yml",
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "docker compose up -d",
-	}
-
-	cfg, err := Parse(args)
+func TestParse_DefaultSSHStyleArgs(t *testing.T) {
+	cfg, err := Parse([]string{"deploy@10.0.0.5", "app:latest"})
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{"compose.yml"}, cfg.ComposeFiles)
 	assert.Equal(t, "deploy", cfg.User)
 	assert.Equal(t, "10.0.0.5", cfg.Host)
+	assert.Equal(t, "app:latest", cfg.Image)
+	assert.Equal(t, "", cfg.KeyPath)
+	assert.Equal(t, 22, cfg.Port)
+}
+
+func TestParse_WithIdentityAndPort(t *testing.T) {
+	cfg, err := Parse([]string{"-i", "~/.ssh/id_ed25519", "-p", "2222", "root@example.com", "ghcr.io/acme/app:dev"})
+
+	require.NoError(t, err)
+	assert.Equal(t, "root", cfg.User)
+	assert.Equal(t, "example.com", cfg.Host)
+	assert.Equal(t, "ghcr.io/acme/app:dev", cfg.Image)
 	assert.Equal(t, "~/.ssh/id_ed25519", cfg.KeyPath)
-	assert.Equal(t, "docker compose up -d", cfg.Command)
+	assert.Equal(t, 2222, cfg.Port)
 }
 
-func TestParse_AllFlagsMissing(t *testing.T) {
-	_, err := Parse([]string{})
+func TestParse_AllArgumentsMissing(t *testing.T) {
+	_, err := Parse(nil)
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Missing required flags:")
-	assert.Contains(t, err.Error(), "--docker-compose")
-	assert.Contains(t, err.Error(), "--user")
-	assert.Contains(t, err.Error(), "--host")
-	assert.Contains(t, err.Error(), "--key")
-	assert.Contains(t, err.Error(), "--command")
+	assert.Contains(t, err.Error(), "missing required arguments: <user@host>, <image[:tag]>")
+	assert.Contains(t, err.Error(), usageLine)
 }
 
-func TestParse_SomeFlagsMissing(t *testing.T) {
-	args := []string{
-		"--host", "10.0.0.5",
-		"--user", "deploy",
-	}
-
-	_, err := Parse(args)
+func TestParse_ImageMissing(t *testing.T) {
+	_, err := Parse([]string{"deploy@example.com"})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--docker-compose")
-	assert.Contains(t, err.Error(), "--key")
-	assert.Contains(t, err.Error(), "--command")
-	assert.NotContains(t, err.Error(), "--host,")
-	assert.NotContains(t, err.Error(), "--user,")
+	assert.Contains(t, err.Error(), "missing required arguments: <image[:tag]>")
 }
 
-func TestParse_EmptyCommand(t *testing.T) {
-	args := []string{
-		"--docker-compose", "compose.yml",
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "",
-	}
-
-	_, err := Parse(args)
+func TestParse_InvalidTarget(t *testing.T) {
+	_, err := Parse([]string{"example.com", "app:latest"})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--command")
+	assert.Equal(t, "invalid target: example.com — expected <user@host>", err.Error())
 }
 
-func TestParse_MissingFlagError_IncludesUsageLine(t *testing.T) {
-	_, err := Parse([]string{"--host", "example.com"})
+func TestParse_UnexpectedArguments(t *testing.T) {
+	_, err := Parse([]string{"deploy@example.com", "app:latest", "extra"})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Usage: ship")
+	assert.Contains(t, err.Error(), "unexpected arguments: extra")
+	assert.Contains(t, err.Error(), usageLine)
 }
 
-func TestParse_OnlyOneFlag(t *testing.T) {
-	_, err := Parse([]string{"--host", "example.com"})
+func TestParse_EmptyIdentityFlag(t *testing.T) {
+	_, err := Parse([]string{"-i", "", "deploy@example.com", "app:latest"})
 
 	require.Error(t, err)
-	msg := err.Error()
-	// Exactly 4 missing flags.
-	assert.Contains(t, msg, "--docker-compose")
-	assert.Contains(t, msg, "--user")
-	assert.Contains(t, msg, "--key")
-	assert.Contains(t, msg, "--command")
+	assert.Equal(t, "empty -i flag — provide the path to an SSH private key", err.Error())
 }
 
-func TestParse_WhitespaceOnlyCommand(t *testing.T) {
-	args := []string{
-		"--docker-compose", "compose.yml",
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "   ",
-	}
-
-	_, err := Parse(args)
+func TestParse_InvalidPort(t *testing.T) {
+	_, err := Parse([]string{"-p", "0", "deploy@example.com", "app:latest"})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--command")
-}
-
-func TestParse_MissingFlagsFormat(t *testing.T) {
-	_, err := Parse([]string{"--user", "deploy", "--host", "example.com", "--key", "key.pem", "--command", "echo"})
-
-	require.Error(t, err)
-	msg := err.Error()
-	// Single line for missing flags, not one per flag.
-	assert.Contains(t, msg, "Missing required flags: --docker-compose")
-}
-
-func TestParse_MissingFlagsUsageLine(t *testing.T) {
-	_, err := Parse([]string{})
-
-	require.Error(t, err)
-	msg := err.Error()
-	lines := strings.SplitN(msg, "\n", 2)
-	require.Len(t, lines, 2)
-	assert.Equal(t, "Usage: ship --docker-compose <path> --user <user> --host <host> --key <path> --command <cmd>", lines[1])
+	assert.Equal(t, "invalid -p value: 0 — port must be greater than 0", err.Error())
 }
 
 func TestParse_Help(t *testing.T) {
@@ -130,150 +81,20 @@ func TestParse_Help(t *testing.T) {
 	require.ErrorIs(t, err, flag.ErrHelp)
 }
 
-func TestParse_CommaSeparatedComposeFiles(t *testing.T) {
-	args := []string{
-		"--docker-compose", "compose.yml,compose.prod.yml",
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "docker compose up -d",
-	}
-
-	cfg, err := Parse(args)
-
-	require.NoError(t, err)
-	assert.Equal(t, []string{"compose.yml", "compose.prod.yml"}, cfg.ComposeFiles)
-}
-
-func TestParse_SingleComposeFile(t *testing.T) {
-	args := []string{
-		"--docker-compose", "compose.yml",
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "docker compose up -d",
-	}
-
-	cfg, err := Parse(args)
-
-	require.NoError(t, err)
-	assert.Equal(t, []string{"compose.yml"}, cfg.ComposeFiles)
-}
-
-func TestParse_ComposeFilesWhitespaceTrimmed(t *testing.T) {
-	args := []string{
-		"--docker-compose", "compose.yml, compose.prod.yml",
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "docker compose up -d",
-	}
-
-	cfg, err := Parse(args)
-
-	require.NoError(t, err)
-	assert.Equal(t, []string{"compose.yml", "compose.prod.yml"}, cfg.ComposeFiles)
-}
-
-func TestParse_EmptyCommandMessage(t *testing.T) {
-	args := []string{
-		"--docker-compose", "compose.yml",
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "",
-	}
-
-	_, err := Parse(args)
-
-	require.Error(t, err)
-	assert.Equal(t, "Empty --command flag \u2014 provide the command to run on the remote host", err.Error())
-}
-
-func TestParse_EmptyCommandExitsBeforeWorkflow(t *testing.T) {
-	args := []string{
-		"--docker-compose", "compose.yml",
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "",
-	}
-
-	_, err := Parse(args)
-
-	require.Error(t, err)
-	assert.NotContains(t, err.Error(), "Missing required flags")
-}
-
-func TestParse_EmptyComposeFiles(t *testing.T) {
-	args := []string{
-		"--docker-compose", "",
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "echo hi",
-	}
-
-	_, err := Parse(args)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Missing required flags: --docker-compose")
-}
-
-func TestParse_TrailingComma(t *testing.T) {
-	args := []string{
-		"--docker-compose", "compose.yml,",
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "echo hi",
-	}
-
-	cfg, err := Parse(args)
-
-	require.NoError(t, err)
-	assert.Equal(t, []string{"compose.yml"}, cfg.ComposeFiles)
-}
-
-func TestParse_ThreeComposeFiles(t *testing.T) {
-	args := []string{
-		"--docker-compose", "a.yml,b.yml,c.yml",
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "echo hi",
-	}
-
-	cfg, err := Parse(args)
-
-	require.NoError(t, err)
-	assert.Equal(t, []string{"a.yml", "b.yml", "c.yml"}, cfg.ComposeFiles)
-}
-
 func TestHelpText_MatchesDesignSpec(t *testing.T) {
-	_, err := Parse([]string{"--help"})
-
-	require.ErrorIs(t, err, flag.ErrHelp)
-
-	expected := "ship \u2014 build, transfer, and deploy Docker Compose images to a remote host"
-	assert.Contains(t, HelpText, expected)
-	assert.Contains(t, HelpText, "Required Flags:")
+	assert.Contains(t, HelpText, "ship — transfer a local Docker image to a remote host over SSH")
+	assert.Contains(t, HelpText, "Usage:")
+	assert.Contains(t, HelpText, "<user@host> <image[:tag]>")
+	assert.Contains(t, HelpText, "-i, --identity-file <path>")
+	assert.Contains(t, HelpText, "-p, --port <port>")
 	assert.Contains(t, HelpText, "Examples:")
 }
 
-func TestHelpText_ContainsMultiFileExample(t *testing.T) {
-	assert.Contains(t, HelpText, "compose.yml,compose.prod.yml")
-}
+func TestUsageLine(t *testing.T) {
+	_, err := Parse(nil)
 
-func TestHelpText_AllFlagsDocumented(t *testing.T) {
-	assert.Contains(t, HelpText, "--docker-compose")
-	assert.Contains(t, HelpText, "--user")
-	assert.Contains(t, HelpText, "--host")
-	assert.Contains(t, HelpText, "--key")
-	assert.Contains(t, HelpText, "--command")
-	assert.Contains(t, HelpText, "Path to compose file(s), comma-separated for multiple")
-	assert.Contains(t, HelpText, "SSH user on the remote host")
-	assert.Contains(t, HelpText, "Remote host address")
-	assert.Contains(t, HelpText, "Path to SSH private key file")
-	assert.Contains(t, HelpText, "Command to execute on the remote host after transfer")
+	require.Error(t, err)
+	lines := strings.SplitN(err.Error(), "\n", 2)
+	require.Len(t, lines, 2)
+	assert.Equal(t, usageLine, lines[1])
 }

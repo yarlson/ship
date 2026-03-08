@@ -11,63 +11,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTag_CreatesTransferTags(t *testing.T) {
+func TestTag_CreatesTransferTag(t *testing.T) {
 	requireDocker(t)
-	composePath := setupComposeProject(t)
+	original := "ship-inttest-app:latest"
+	transfer := "localhost:5001/ship-inttest-app:latest"
+	ensureLocalImage(t, original)
 
-	// First build images.
-	var imageMap map[string]string
-	captureOutput(func() {
-		var err error
-		imageMap, err = Build([]string{composePath})
+	out := captureOutput(func() {
+		err := Tag(original, transfer)
 		require.NoError(t, err)
 	})
 
-	// Now tag them.
-	captureOutput(func() {
-		err := Tag(imageMap)
-		require.NoError(t, err)
-	})
+	assert.Contains(t, out, "[1/5] Tagging image for transfer...")
+	assert.Contains(t, out, "[1/5] Tag complete")
 
-	// Verify transfer tags exist via docker image inspect.
-	for _, transfer := range imageMap {
-		cmd := exec.CommandContext(context.Background(), "docker", "image", "inspect", transfer)
-		require.NoError(t, cmd.Run(), "transfer tag should exist: %s", transfer)
-	}
+	cmd := exec.CommandContext(context.Background(), "docker", "image", "inspect", transfer)
+	require.NoError(t, cmd.Run(), "transfer tag should exist: %s", transfer)
 }
 
-func TestBuildAndTag_HappyPath_E2E(t *testing.T) {
+func TestTag_FailsOnMissingSourceImage(t *testing.T) {
 	requireDocker(t)
-	composePath := setupComposeProject(t)
 
-	// Stage 1: Build.
-	var imageMap map[string]string
-	out := captureOutput(func() {
-		var err error
-		imageMap, err = Build([]string{composePath})
-		require.NoError(t, err)
-	})
-
-	require.Len(t, imageMap, 2)
-	assert.Contains(t, out, "[1/7] Building images...")
-	assert.Contains(t, out, "[1/7] Build complete (2 images)")
-
-	// Stage 2: Tag.
-	out = captureOutput(func() {
-		err := Tag(imageMap)
-		require.NoError(t, err)
-	})
-
-	assert.Contains(t, out, "[2/7] Tagging images for transfer...")
-	assert.Contains(t, out, "[2/7] Tag complete")
-
-	// Verify transfer tags exist; image-only service excluded.
-	for original, transfer := range imageMap {
-		inspect := exec.CommandContext(context.Background(), "docker", "image", "inspect", transfer)
-		require.NoError(t, inspect.Run(), "transfer tag should exist: %s (from %s)", transfer, original)
-	}
-
-	// Verify redis was NOT tagged.
-	inspect := exec.CommandContext(context.Background(), "docker", "image", "inspect", "localhost:5001/redis:alpine")
-	assert.Error(t, inspect.Run(), "redis should not have a transfer tag")
+	err := Tag("ship-missing-image:latest", "localhost:5001/ship-missing-image:latest")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to tag ship-missing-image:latest")
 }

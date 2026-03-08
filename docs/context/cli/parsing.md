@@ -1,74 +1,40 @@
-# CLI Parsing & Validation
+# CLI Parsing
 
-## Required Flags
-
-- `--docker-compose` — Path(s) to Docker Compose file(s), comma-separated if multiple
-- `--user` — SSH username on remote host
-- `--host` — Remote host address (IP or hostname)
-- `--key` — Path to SSH private key file
-- `--command` — Command to execute on remote host after transfer
-
-## Implementation
-
-**File:** `cli/cli.go`
-
-**Flow:**
-
-1. `Parse(args)` creates a FlagSet with all 5 required flags
-2. Parses arguments
-3. Splits `--docker-compose` value on commas, trims whitespace, filters empty strings into `[]string`
-4. Validates all required flags are present and non-empty
-5. Detects explicit empty `--command ""` (distinct from missing `--command`)
-6. Returns typed `Config` struct or error listing missing flags
-
-**Config struct:**
-
-```go
-type Config struct {
-    ComposeFiles []string // Parsed compose file paths
-    User         string   // SSH user
-    Host         string   // Remote host
-    KeyPath      string   // SSH key path
-    Command      string   // Remote command
-}
-```
-
-## Help Text
-
-Help text is a constant with usage and examples. Displayed on `--help` flag.
-
-**Example invocations:**
-
-Single compose file:
+## Command Shape
 
 ```bash
-ship --docker-compose docker-compose.yml \
-     --user deploy \
-     --host 10.0.0.5 \
-     --key ~/.ssh/id_ed25519 \
-     --command "docker compose up -d"
+ship [-i key] [-p port] user@host image[:tag]
 ```
 
-Multiple compose files (comma-separated):
+## Parsed Fields
 
-```bash
-ship --docker-compose compose.yml,compose.prod.yml \
-     --user root \
-     --host staging.example.com \
-     --key ./key.pem \
-     --command "docker compose pull && docker compose up -d"
-```
+`cli.Config` contains:
 
-## Error Handling
+- `Image`
+- `User`
+- `Host`
+- `KeyPath`
+- `Port`
 
-- Missing flags → error message listing all missing flags by name + usage line
-- `--help` → returns `flag.ErrHelp` (handled in main)
-- No secrets logged in error messages
+## Parsing Rules
 
-## Testing
+1. Parse optional flags first:
+   - `-i`, `--identity-file`
+   - `-p`, `--port`
+2. Expect exactly two positional arguments after flags:
+   - `<user@host>`
+   - `<image[:tag]>`
+3. Split the target positional on `@` into `User` and `Host`.
+4. Reject missing, malformed, or extra positional arguments.
+5. Reject empty `-i` values and non-positive ports.
 
-Tests in `cli/cli_test.go` verify:
+## Error Style
 
-- Valid Config accepted
-- Missing flags detected and reported
-- Help flag handling
+Examples:
+
+- `missing required arguments: <user@host>, <image[:tag]>`
+- `invalid target: example.com — expected <user@host>`
+- `unexpected arguments: extra`
+- `empty -i flag — provide the path to an SSH private key`
+
+`main.go` prints these as `Error: <message>`.

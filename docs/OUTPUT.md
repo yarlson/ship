@@ -1,21 +1,19 @@
 # Output Rules
 
-All user-facing output must follow these rules. Full spec: `.snap/sessions/default/tasks/DESIGN.md`
-
 ## Stage Progress
 
 ```
-[N/7] <Present participle>...       ← stage start (stdout)
-[N/7] <Noun> complete (<detail>)    ← stage end (stdout)
+[N/5] <Present participle>...  ← stage start (stdout)
+[N/5] <Noun> complete          ← stage end (stdout)
 ```
 
 Examples:
 
 ```
-[1/7] Building images...
-[1/7] Build complete (3 images)
-[5/7] Establishing tunnel to deploy.example.com...
-[5/7] Tunnel established
+[1/5] Tagging image for transfer...
+[1/5] Tag complete
+[4/5] Establishing tunnel to deploy.example.com...
+[4/5] Tunnel established
 ```
 
 ## Errors
@@ -27,8 +25,8 @@ Error: <what failed> — <remediation hint>    ← always to stderr
 Examples:
 
 ```
-Error: Build failed — see docker compose output above
-Error: SSH tunnel failed — connection refused (verify --host and --key)
+Error: Local image not found: app:latest — build or pull it first
+Error: SSH tunnel failed — verify the target and SSH credentials
 Error: Port 5001 already in use — stop the existing process or free the port
 ```
 
@@ -37,34 +35,17 @@ Error: Port 5001 already in use — stop the existing process or free the port
 ```
 Ship complete
   Host:     <host>
-  Images:   <original names, comma-separated>
-  Command:  <command>
+  Image:    <original image tag>
   Status:   Success
 ```
 
-Labels are 10 chars wide including colon. Image names use original compose refs, never `localhost:5001/` transfer tags.
+Labels are 10 chars wide including colon. The summary shows the original image ref, never the `localhost:5001/` transfer tag.
 
 ## Hard Rules
 
-- No ANSI escape codes or color (MVP)
+- No ANSI escape codes or color
 - No emoji
-- No first person ("I", "we")
-- No second person in progress/summary ("you") — allowed only in error hints
-- No hedging ("might", "possibly", "try to")
-- Errors reference the relevant `--flag` when caused by user input
-- Errors include the actual value (path, host) when not sensitive
-- Docker/SSH passthrough output is never reformatted
+- No hedging
 - Stage start line must be printed before its error
 - No blank lines between stage progress lines
-- Missing-flag errors list ALL missing flags in one message, followed by usage line
-
-## Terminology
-
-| Use          | Avoid                   |
-| ------------ | ----------------------- |
-| stage        | step, phase, task       |
-| image        | container, artifact     |
-| transfer     | upload, sync            |
-| remote host  | server, target, machine |
-| tunnel       | connection, link        |
-| compose file | config, manifest        |
+- Docker and SSH passthrough output is never reformatted

@@ -32,127 +32,32 @@ func queryRegistryTags(t *testing.T, name string) []string {
 	return result.Tags
 }
 
-func TestRegistryAndPush_HappyPath_E2E(t *testing.T) {
+func TestRegistryAndPush_HappyPath(t *testing.T) {
 	requireDocker(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
 
-	composePath := setupComposeProject(t)
+	original := "ship-inttest-push:latest"
+	transfer := "localhost:5001/ship-inttest-push:latest"
+	ensureLocalImage(t, original)
+	require.NoError(t, Tag(original, transfer))
 
-	// Stage 1: Build.
-	var imageMap map[string]string
-	captureOutput(func() {
-		var err error
-		imageMap, err = Build([]string{composePath})
-		require.NoError(t, err)
-	})
-
-	// Stage 2: Tag.
-	captureOutput(func() {
-		err := Tag(imageMap)
-		require.NoError(t, err)
-	})
-
-	// Stage 3: Registry.
 	captureOutput(func() {
 		err := Registry()
 		require.NoError(t, err)
 	})
 
-	assert.True(t, registryRunning(t), "registry should be running")
-
-	// Stage 4: Push.
 	out := captureOutput(func() {
-		err := Push(imageMap)
+		err := Push(transfer)
 		require.NoError(t, err)
 	})
 
-	assert.Contains(t, out, "[4/7] Pushing images to local registry...")
-	assert.Contains(t, out, "[4/7] Push complete (2 images)")
+	assert.Contains(t, out, "[3/5] Pushing image to local registry...")
+	assert.Contains(t, out, "[3/5] Push complete")
 
-	// Verify images are queryable via registry HTTP API.
-	for _, name := range []string{"ship-inttest-web", "ship-inttest-api"} {
-		tags := queryRegistryTags(t, name)
-		assert.Contains(t, tags, "latest", "image %s should have latest tag in registry", name)
-	}
-}
-
-func TestPush_PushesImagesToRegistry(t *testing.T) {
-	requireDocker(t)
-	testlock.Port5001(t)
-	testlock.StopRegistry(t)
-	t.Cleanup(func() { testlock.StopRegistry(t) })
-
-	composePath := setupComposeProject(t)
-
-	// Build and tag.
-	var imageMap map[string]string
-	captureOutput(func() {
-		var err error
-		imageMap, err = Build([]string{composePath})
-		require.NoError(t, err)
-	})
-	captureOutput(func() {
-		require.NoError(t, Tag(imageMap))
-	})
-
-	// Ensure registry running.
-	captureOutput(func() {
-		require.NoError(t, Registry())
-	})
-
-	// Push.
-	captureOutput(func() {
-		err := Push(imageMap)
-		require.NoError(t, err)
-	})
-
-	// Verify via registry HTTP API.
-	for _, name := range []string{"ship-inttest-web", "ship-inttest-api"} {
-		tags := queryRegistryTags(t, name)
-		assert.NotEmpty(t, tags, "image %s should have tags in registry", name)
-	}
-}
-
-func TestPush_ReportsImageCount(t *testing.T) {
-	requireDocker(t)
-	testlock.Port5001(t)
-	testlock.StopRegistry(t)
-	t.Cleanup(func() { testlock.StopRegistry(t) })
-
-	composePath := setupComposeProject(t)
-
-	var imageMap map[string]string
-	captureOutput(func() {
-		var err error
-		imageMap, err = Build([]string{composePath})
-		require.NoError(t, err)
-	})
-	captureOutput(func() {
-		require.NoError(t, Tag(imageMap))
-	})
-
-	captureOutput(func() {
-		require.NoError(t, Registry())
-	})
-
-	out := captureOutput(func() {
-		err := Push(imageMap)
-		require.NoError(t, err)
-	})
-
-	assert.Contains(t, out, "Push complete (2 images)")
-}
-
-func TestPush_EmptyImageMap(t *testing.T) {
-	out := captureOutput(func() {
-		err := Push(map[string]string{})
-		require.NoError(t, err)
-	})
-
-	assert.Contains(t, out, "[4/7] Pushing images to local registry...")
-	assert.Contains(t, out, "[4/7] Push complete (0 images)")
+	tags := queryRegistryTags(t, "ship-inttest-push")
+	assert.Contains(t, tags, "latest")
 }
 
 func TestPush_FailsOnBadImageRef(t *testing.T) {
@@ -161,18 +66,11 @@ func TestPush_FailsOnBadImageRef(t *testing.T) {
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
 
-	// Ensure registry is running.
 	captureOutput(func() {
 		require.NoError(t, Registry())
 	})
 
-	imageMap := map[string]string{
-		"nonexistent:latest": "localhost:5001/nonexistent:latest",
-	}
-
-	captureOutput(func() {
-		err := Push(imageMap)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "localhost:5001/nonexistent:latest")
-	})
+	err := Push("localhost:5001/nonexistent:latest")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "localhost:5001/nonexistent:latest")
 }

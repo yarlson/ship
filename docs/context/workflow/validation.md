@@ -1,72 +1,28 @@
-# Preflight Validation & Error Handling
+# Workflow Validation
 
-## Preflight Validation
+## Preflight Checks
 
-Preflight checks run at the start of `workflow.Run()` before any stages execute. Function: `workflow.Preflight(cfg)`.
+`workflow.Preflight(cfg)` runs these checks in order:
 
-**Check sequence:**
+1. Docker is installed and responsive
+2. `ssh` is installed
+3. the SSH key path exists if `cfg.KeyPath` is not empty
+4. the local Docker image exists
+5. SSH connectivity to `cfg.User@cfg.Host` works
 
-1. **Docker installed** — `docker version` returns 0
-   - Error: `Docker is not installed or not in PATH`
-   - No hint (essential dependency, no workaround)
+Preflight stops on the first failure.
 
-2. **Docker Compose V2** — `docker compose version` returns 0
-   - Error: `docker compose (V2) is required — upgrade Docker Compose or install the compose plugin`
-   - Hint included in error message
+## Error Shape
 
-3. **SSH installed** — `ssh` command found in PATH via `exec.LookPath("ssh")`
-   - Error: `ssh is not installed or not in PATH`
-   - No hint (essential dependency)
+Representative messages:
 
-4. **SSH key file accessible** — `os.Stat(filepath.Clean(keyPath))` succeeds
-   - Error on not found: `SSH key file not found: <path> — verify the --key path`
-   - Error on unreadable: `Cannot read SSH key file: <path> — check file permissions`
-   - Hint included in error message
+- `docker is not installed or not in PATH`
+- `SSH key file not found: /path/to/key — verify the -i path`
+- `local image not found: app:latest — build or pull it first`
+- `SSH connection failed — verify the target and SSH credentials`
 
-5. **Compose files accessible** — `os.Stat(filepath.Clean(path))` succeeds for each file in `cfg.ComposeFiles`
-   - Error on not found: `Compose file not found: <path>`
-   - Error on unreadable: `Cannot read compose file: <path> — check file permissions`
-   - Returns on first missing/unreadable file
-   - Validates all files exist before any stages run
+## Notes
 
-6. **SSH connectivity** — `ssh -i <key> -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o BatchMode=yes <user>@<host> true` returns 0
-   - Error: `SSH connection failed — verify --host and --key`
-   - Hint included in error message
-
-**Exit behavior:** Checks run sequentially. Returns on first failure. No stages execute if any preflight check fails.
-
-## StageError Type
-
-**File:** `workflow/errors.go`
-
-**Structure:**
-
-```go
-type StageError struct {
-    Stage int    // 1-7
-    Name  string // "Build", "Tag", etc.
-    Err   error  // underlying error
-    Hint  string // optional hint text
-}
-
-// Error() returns "<what> — <hint>" if hint present, else "<what>"
-// Unwrap() returns Err for errors.Is/errors.As compatibility
-```
-
-**Usage:**
-
-- All stage failures wrapped: `return wrapStageErr(stageNum, stageName, err)`
-- Preflight errors returned directly without wrapping
-- `main.go` adds `Error: ` prefix when printing to stderr
-
-**Format examples:**
-
-- With hint: `Error: SSH connection failed — verify --host and --key`
-- Without hint: `Error: Cannot read SSH key file: /path/to/key — check file permissions`
-
-## Fail-Fast Pattern
-
-- Preflight checks run in sequence, exit on first failure
-- Stages execute in sequence, exit on first failure
-- No recovery or retries within workflow
-- Errors bubble up to `main.go` which prints and exits with code 1
+- Missing key path is allowed if the user relies on normal SSH identity resolution.
+- SSH connectivity is tested with a remote `true` command before any transfer stages run.
+- Preflight does not create Docker objects or open tunnels.

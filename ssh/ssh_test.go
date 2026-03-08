@@ -8,10 +8,12 @@ import (
 )
 
 func TestBuildSSHArgs_RemoteCommand(t *testing.T) {
-	args := BuildRemoteCommandArgs("/home/user/.ssh/id_rsa", "deploy", "10.0.0.5", "echo hello")
+	args := BuildRemoteCommandArgs("/home/user/.ssh/id_rsa", 2222, "deploy", "10.0.0.5", "echo hello")
 
 	require.Contains(t, args, "-i")
 	require.Contains(t, args, "/home/user/.ssh/id_rsa")
+	require.Contains(t, args, "-p")
+	require.Contains(t, args, "2222")
 	require.Contains(t, args, "deploy@10.0.0.5")
 	require.Contains(t, args, "echo hello")
 
@@ -25,21 +27,31 @@ func TestBuildSSHArgs_RemoteCommand(t *testing.T) {
 }
 
 func TestBuildSSHArgs_Tunnel(t *testing.T) {
-	args := BuildTunnelArgs("/home/user/.ssh/id_rsa", "root", "example.com")
+	args := BuildTunnelArgs("/home/user/.ssh/id_rsa", 22, "root", "example.com")
 
 	require.Contains(t, args, "-i")
 	require.Contains(t, args, "/home/user/.ssh/id_rsa")
+	require.Contains(t, args, "-p")
+	require.Contains(t, args, "22")
 	require.Contains(t, args, "-R")
 	require.Contains(t, args, "5001:localhost:5001")
 	require.Contains(t, args, "-N")
 	require.Contains(t, args, "root@example.com")
 }
 
+func TestBuildSSHArgs_WithoutIdentityFile(t *testing.T) {
+	args := BuildRemoteCommandArgs("", 22, "deploy", "10.0.0.5", "echo hello")
+
+	assert.NotContains(t, args, "-i")
+	assert.Contains(t, args, "-p")
+	assert.Contains(t, args, "22")
+}
+
 func TestNoKeyContentsInArgs(t *testing.T) {
 	keyPath := "/home/user/.ssh/id_rsa"
 
-	remoteArgs := BuildRemoteCommandArgs(keyPath, "user", "host", "cmd")
-	tunnelArgs := BuildTunnelArgs(keyPath, "user", "host")
+	remoteArgs := BuildRemoteCommandArgs(keyPath, 22, "user", "host", "cmd")
+	tunnelArgs := BuildTunnelArgs(keyPath, 22, "user", "host")
 
 	allArgs := make([]string, 0, len(remoteArgs)+len(tunnelArgs))
 	allArgs = append(allArgs, remoteArgs...)

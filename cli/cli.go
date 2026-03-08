@@ -4,109 +4,103 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 )
 
-// Config holds the parsed CLI flags.
+// Config holds the parsed CLI arguments.
 type Config struct {
-	ComposeFiles []string
-	User         string
-	Host         string
-	KeyPath      string
-	Command      string
+	Image   string
+	User    string
+	Host    string
+	KeyPath string
+	Port    int
 }
 
 // HelpText is the complete help output printed when --help is passed.
-const HelpText = `ship — build, transfer, and deploy Docker Compose images to a remote host
+const HelpText = `ship — transfer a local Docker image to a remote host over SSH
 
 Usage:
-  ship [flags]
+  ship [flags] <user@host> <image[:tag]>
 
-Required Flags:
-  --docker-compose <path>   Path to compose file(s), comma-separated for multiple
-  --user <user>             SSH user on the remote host
-  --host <host>             Remote host address
-  --key <path>              Path to SSH private key file
-  --command <cmd>           Command to execute on the remote host after transfer
+Flags:
+  -i, --identity-file <path>  Path to SSH private key file
+  -p, --port <port>           SSH port (default: 22)
 
 Examples:
-  ship --docker-compose docker-compose.yml --user deploy --host 10.0.0.5 --key ~/.ssh/id_ed25519 --command "docker compose up -d"
-  ship --docker-compose compose.yml,compose.prod.yml --user root --host staging.example.com --key ./key.pem --command "docker compose pull && docker compose up -d"
+  ship root@10.0.0.1 app:latest
+  ship -i ~/.ssh/id_ed25519 deploy@staging.example.com app:latest
+  ship -i ~/.ssh/id_ed25519 -p 2222 deploy@staging.example.com ghcr.io/acme/app:dev
 `
 
-const usageLine = "Usage: ship --docker-compose <path> --user <user> --host <host> --key <path> --command <cmd>"
+const usageLine = "Usage: ship [-i <path>] [-p <port>] <user@host> <image[:tag]>"
 
-// splitComposeFiles splits a comma-separated string into a slice of trimmed paths.
-// Returns nil if input is empty or contains only whitespace/commas.
-func splitComposeFiles(raw string) []string {
-	if raw == "" {
-		return nil
-	}
-	parts := strings.Split(raw, ",")
-	var result []string
-	for _, p := range parts {
-		trimmed := strings.TrimSpace(p)
-		if trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-	return result
-}
-
-// Parse parses CLI flags from args and returns a Config.
+// Parse parses CLI args and returns a Config.
 // Returns flag.ErrHelp when --help is requested.
-// Returns an error listing all missing flags if any required flag is absent or empty.
 func Parse(args []string) (Config, error) {
 	fs := flag.NewFlagSet("ship", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
 	var cfg Config
-	var rawCompose string
-	fs.StringVar(&rawCompose, "docker-compose", "", "")
-	fs.StringVar(&cfg.User, "user", "", "")
-	fs.StringVar(&cfg.Host, "host", "", "")
-	fs.StringVar(&cfg.KeyPath, "key", "", "")
-	fs.StringVar(&cfg.Command, "command", "", "")
+	fs.StringVar(&cfg.KeyPath, "i", "", "")
+	fs.StringVar(&cfg.KeyPath, "identity-file", "", "")
+	fs.IntVar(&cfg.Port, "p", 22, "")
+	fs.IntVar(&cfg.Port, "port", 22, "")
 
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
 	}
 
-	cfg.ComposeFiles = splitComposeFiles(rawCompose)
-
-	// Track which flags were explicitly provided.
 	explicitlySet := make(map[string]bool)
 	fs.Visit(func(f *flag.Flag) {
 		explicitlySet[f.Name] = true
 	})
 
-	var missing []string
-	if len(cfg.ComposeFiles) == 0 {
-		missing = append(missing, "--docker-compose")
-	}
-	if cfg.User == "" {
-		missing = append(missing, "--user")
-	}
-	if cfg.Host == "" {
-		missing = append(missing, "--host")
-	}
-	if cfg.KeyPath == "" {
-		missing = append(missing, "--key")
+	if (explicitlySet["i"] || explicitlySet["identity-file"]) && strings.TrimSpace(cfg.KeyPath) == "" {
+		return Config{}, fmt.Errorf("empty -i flag — provide the path to an SSH private key")
 	}
 
-	commandEmpty := strings.TrimSpace(cfg.Command) == ""
-	switch {
-	case !explicitlySet["command"]:
-		missing = append(missing, "--command")
-	case commandEmpty && len(missing) == 0:
-		return Config{}, fmt.Errorf("Empty --command flag — provide the command to run on the remote host") //nolint:staticcheck // user-facing message per DESIGN.md spec
-	case commandEmpty:
-		missing = append(missing, "--command")
+	if cfg.Port <= 0 {
+		return Config{}, fmt.Errorf("invalid -p value: %s — port must be greater than 0", strconv.Itoa(cfg.Port))
 	}
 
+	positional := fs.Args()
+	missing := missingPositionals(positional)
 	if len(missing) > 0 {
-		return Config{}, fmt.Errorf("Missing required flags: %s\n%s", strings.Join(missing, ", "), usageLine) //nolint:staticcheck // user-facing message per DESIGN.md spec
+		return Config{}, fmt.Errorf("missing required arguments: %s\n%s", strings.Join(missing, ", "), usageLine)
 	}
+
+	if len(positional) > 2 {
+		return Config{}, fmt.Errorf("unexpected arguments: %s\n%s", strings.Join(positional[2:], ", "), usageLine)
+	}
+
+	user, host, err := parseTarget(positional[0])
+	if err != nil {
+		return Config{}, err
+	}
+
+	cfg.User = user
+	cfg.Host = host
+	cfg.Image = positional[1]
 
 	return cfg, nil
+}
+
+func missingPositionals(positional []string) []string {
+	switch len(positional) {
+	case 0:
+		return []string{"<user@host>", "<image[:tag]>"}
+	case 1:
+		return []string{"<image[:tag]>"}
+	default:
+		return nil
+	}
+}
+
+func parseTarget(target string) (user, host string, err error) {
+	user, host, ok := strings.Cut(target, "@")
+	if !ok || strings.TrimSpace(user) == "" || strings.TrimSpace(host) == "" {
+		return "", "", fmt.Errorf("invalid target: %s — expected <user@host>", target)
+	}
+	return user, host, nil
 }

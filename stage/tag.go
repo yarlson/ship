@@ -7,17 +7,14 @@ import (
 	"ship/progress"
 )
 
-// Tag executes Stage 2: re-tag images with localhost:5001/ prefix for transfer.
-// imageMap maps original image ref → transfer tag.
-func Tag(imageMap map[string]string) error {
-	progress.StageStart(2, "Tagging images for transfer")
+// Tag executes Stage 1: re-tag the local image with a localhost:5001/ prefix for transfer.
+func Tag(original, transfer string) error {
+	progress.StageStart(1, "Tagging image for transfer")
 
-	for original, transfer := range imageMap {
-		if err := docker.TagImage(original, transfer); err != nil {
-			return fmt.Errorf("Failed to tag %s — %w", original, err) //nolint:staticcheck // user-facing message per DESIGN.md spec
-		}
+	if err := docker.TagImage(original, transfer); err != nil {
+		return fmt.Errorf("failed to tag %s — %w", original, err)
 	}
 
-	progress.StageComplete(2, "Tag complete")
+	progress.StageComplete(1, "Tag complete")
 	return nil
 }

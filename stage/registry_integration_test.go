@@ -97,6 +97,6 @@ func TestRegistry_ProgressOutput(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	assert.Contains(t, out, "[3/7] Starting local registry...")
-	assert.Contains(t, out, "[3/7] Registry ready")
+	assert.Contains(t, out, "[2/5] Starting local registry...")
+	assert.Contains(t, out, "[2/5] Registry ready")
 }

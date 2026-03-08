@@ -1,39 +1,19 @@
 # Terminology
 
-**CLI Config** — Parsed command-line flags as a typed struct (`cli.Config`). Contains: compose files, SSH user/host/key, and deployment command.
+**CLI config** — Parsed command-line input stored in `cli.Config`. Contains `Image`, `User`, `Host`, optional `KeyPath`, and `Port`.
 
-**Local registry** — Docker registry running on `localhost:5001` used as an intermediate storage point to push images locally before transferring to remote.
+**Original image** — The image reference the user passed to `ship`, for example `app:latest`.
 
-**Reverse SSH tunnel** — Background SSH process that forwards the remote host's port to the local registry port, allowing remote pulls from localhost:5001.
+**Transfer tag** — The temporary local-registry form of the image ref, for example `localhost:5001/app:latest`.
 
-**Stage** — One step in the 7-stage deployment pipeline (e.g., "Build images", "Push to local registry"). Each stage has a start and completion message.
+**Local registry** — A registry container running locally and exposed on port `5001`. Used only as the transfer bridge.
 
-**WorkflowState** — Shared mutable state passed through stages containing image metadata and tunnel process handle (future implementation).
+**Reverse tunnel** — An SSH `-R 5001:localhost:5001` tunnel that lets the remote host reach the local registry.
 
-**Compose file(s)** — Docker Compose YAML file(s) passed via `--docker-compose` flag. Can be comma-separated for multiple files.
+**Remote restore** — The remote `docker tag <transfer> <original>` step that restores the original image ref after pull.
 
-**Image tagging** — Re-tagging Docker images from their original names (e.g., `web:latest`) to local registry format (e.g., `localhost:5001/web:latest`) for local registry push.
+**Stage** — One of the 5 ordered workflow steps: tag, registry, push, tunnel, pull/restore.
 
-**ImageMap** — A map data structure built in Stage 1 that tracks the correspondence between original image references and their transfer tags. Key: original image ref; Value: `localhost:5001/` prefixed transfer tag. Passed through stages 2, 4 to support tagging and pushing operations.
+**Preflight** — The checks that run before the first stage: Docker, SSH, optional key path, local image existence, and SSH connectivity.
 
-**Transfer tag** — The `localhost:5001/` prefixed image tag used for local registry operations. Derived from the original image name and tag (e.g., `web:latest` → `localhost:5001/web:latest`).
-
-**Compose config** — Output from `docker compose config --format json`. Used in Stage 1 to discover which services have build keys and extract their image names.
-
-**Progress reporting** — Stage progress printed in `[N/7] message` format to help users track deployment progress.
-
-**Fail fast** — Exit immediately on first error with a clear message identifying what failed and what to check.
-
-**Reverse SSH tunnel** — SSH connection with port forwarding (`-R` flag) that makes remote host's forwarded port accessible via local port. Example: `ssh -R 5001:localhost:5001 user@host` allows remote to access localhost:5001 by connecting to its own port 5001.
-
-**TunnelProcess** — Wrapper struct (`ssh.TunnelProcess`) containing the SSH tunnel background process (`*exec.Cmd`), a `done` channel (closed when process exits), and methods for lifecycle management.
-
-**Remote command execution** — Running a command on a remote host via SSH without interaction. Uses `ssh -i key user@host command` with output captured to buffers.
-
-**Output passthrough** — Sending remote command output directly to stdout/stderr without reformatting or suppression. Used in Stage 7 to show deployment command output to the user.
-
-**Tunnel lifecycle** — The sequence: (1) start tunnel in Stage 5, (2) use in Stages 6-7, (3) cleanup via deferred `cleanupTunnel()` on workflow exit. Ensures tunnel is always stopped even on error.
-
-**Preflight checks** — Validation checks run at workflow start before any stages execute. Verify Docker, Docker Compose V2, SSH, SSH key file, and connectivity to remote host. Exit immediately on first failure with a clear error message and hint.
-
-**StageError** — Structured error type that wraps stage failures with metadata: stage number, stage name, underlying error, and optional hint. Formatted for user-facing output: `<error message> — <hint>` or just `<error message>` if no hint.
+**Progress output** — The `[N/5]` lines printed by the workflow to show stage start and completion.

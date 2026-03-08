@@ -1,56 +1,35 @@
-# Practices & Conventions
+# Practices
 
-## Code Quality
+## Product Boundaries
 
-- **Formatting** — Enforced by `golangci-lint run --fix` (gci, gofmt, gofumpt, goimports). No manual style debates.
-- **Import order** — Standard lib → external → local (enforced by gci).
-- **Error wrapping** — Always wrap errors with context using `fmt.Errorf()`. Never swallow errors.
-- **Linter findings** — All enabled linter rules are treated as errors, not warnings.
+- Ship is an image transfer tool, not a deployment orchestrator.
+- Keep the scope at one local image to one remote host.
+- Do not add Docker Compose parsing or build orchestration back into the core path.
+- Do not add arbitrary remote command execution as part of the transfer workflow.
 
-## Testing
+## Code Conventions
 
-- **Framework** — `testify` (`require` for fatal assertions, `assert` for non-fatal).
-- **Table-driven tests** — Used for functions with multiple cases.
-- **Output testing** — Mock `progress.Writer` to capture output in tests instead of checking stdout.
-- **TDD approach** — Write failing test first, then minimal code to pass.
+- Use the standard library `flag` package for CLI parsing.
+- Shell out to `docker` and `ssh`, not Go SDKs.
+- Prefer direct error messages with one clear remediation hint.
+- Keep stage functions narrow and explicit.
 
-## CLI & Error Handling
+## Workflow Conventions
 
-- **Flag library** — Use stdlib `flag`, not cobra/urfave.
-- **Help text** — Defined as constant in `cli.go`, includes examples.
-- **Validation** — All required flags checked. Missing flags listed by name.
-- **Error messages** — User-facing errors name what failed and what to check (no secrets in output).
-- **Stage errors** — All stage failures wrapped in `StageError` type with stage number and name for consistent error reporting.
-- **Capitalized errors** — Capitalized error strings require `//nolint:staticcheck // user-facing message per OUTPUT.md spec` comment.
-- **Preflight checks** — Run before pipeline execution in sequence: Docker, Docker Compose V2, SSH, SSH key file, compose files, SSH connectivity. Fail fast on first check failure with hint text (e.g., "verify the --key path").
+- Run preflight before any stage starts.
+- Print `progress.StageStart()` before doing the stage work.
+- Print `progress.StageComplete()` only after the stage succeeds.
+- Keep tunnel cleanup in `workflow`, not inside the stage call sites.
 
-## Module Boundaries
+## Testing Conventions
 
-- **`cli`** — Only flag parsing. No I/O beyond parsing.
-- **`workflow`** — Stage orchestration. Calls stage functions. Owns sequence.
-- **`progress`** — Output formatting. Testable via `Writer` var.
-- **`docker`** — Docker CLI operations (build, config, tag). Wraps `docker` CLI. Returns errors, not exit codes.
-- **`stage`** — Stage implementations. Each stage function: calls docker/SSH utilities, calls progress functions, returns data for next stage or error.
-- **External processes** — Shell out to `docker` and `ssh` CLIs, not Go SDKs.
+- Unit tests cover parsing, formatting, and small logic branches.
+- Integration tests use real local Docker behavior.
+- E2E tests use a real SSH host and real Docker image transfer.
+- Capture output through `progress.Writer` instead of asserting on raw stdout where possible.
 
-## Stage Implementation Pattern
+## Output Conventions
 
-- **Stage functions:** Named `stage.Build(composeFiles)`, `stage.Tag(imageMap)`, etc. Each takes required inputs and returns (result, error).
-- **Multifile support:** `Build()` receives `[]string` of compose file paths (pre-parsed and validated by preflight checks).
-- **Progress calls:** Each stage opens with `progress.StageStart(n, msg)` and closes with `progress.StageComplete(n, msg)`. Between them are the real operations.
-- **Error flow:** Stages return errors which bubble up to `workflow.Run()`. Errors contain context (what operation, why it failed).
-- **Data passing:** ImageMap pattern used to pass image metadata between stages (Stage 1 → 2 → 4, 6). TunnelProcess passed through workflow state (Stage 5 → cleanup).
-- **Docker operations:** `docker.ComposeBuild()`, `docker.ComposeConfig()`, `docker.TagImage()` handle CLI invocation and error wrapping. All support multiple files.
-
-## SSH Tunnel Lifecycle
-
-- **TunnelProcess ownership:** `workflow.State` holds the single TunnelProcess. Stage 5 returns it; cleanup defers `ssh.StopTunnel()`.
-- **Safe process management:** TunnelProcess has a `done` channel closed by single goroutine when `cmd.Wait()` returns. Prevents data races.
-- **Graceful shutdown:** `ssh.StopTunnel()` sends SIGTERM, waits 5s, then SIGKILL if needed. Returns nil if already exited.
-- **No SDK dependency:** SSH operations use `exec.CommandContext("ssh", ...)` — not Go SSH library. Direct CLI invocation.
-- **Output suppression:** Tunnel stdin/stdout/stderr not captured (allows output to pass through if needed for debugging).
-
-## Secrets & Output
-
-- **Key paths OK** — Safe to log `~/.ssh/id_rsa` paths.
-- **Key contents forbidden** — Never log private key material or remote passwords.
+- Errors are lowercase Go error strings; `main.go` adds the `Error:` prefix.
+- Success summaries show the original image ref, never the `localhost:5001/` transfer tag.
+- No secrets in output. SSH key paths are acceptable; key contents are not.

@@ -1,24 +1,23 @@
 # Testing Strategy
 
-## TDD Workflow (Outside-In)
+## TDD Workflow
 
-1. Write a failing acceptance/integration test describing the desired behavior
-2. Write a failing unit test for the smallest piece needed
-3. Write minimal code to pass the unit test
-4. Refactor while green
-5. Repeat until the acceptance test passes
+1. Write a failing CLI or workflow test for the transfer behavior.
+2. Write the smallest failing unit or stage test underneath it.
+3. Implement the minimum code to pass.
+4. Refactor while green.
 
-Start from the outermost layer (CLI, workflow) and work inward (stages, docker/ssh wrappers).
+The outer contract is now small enough that most changes should start from the CLI or workflow layer.
 
 ## Test Tiers
 
-| Tier        | Scope                                       | Tag           | Docker required |
-| ----------- | ------------------------------------------- | ------------- | --------------- |
-| Unit        | Pure logic: parsing, formatting, validation | (none)        | No              |
-| Integration | Real Docker and local filesystem checks     | `integration` | Yes             |
-| E2E         | Full workflow against the real remote host  | `e2e`         | Yes + SSH       |
+| Tier        | Scope                                      | Tag           | Docker required |
+| ----------- | ------------------------------------------ | ------------- | --------------- |
+| Unit        | Parsing, formatting, validation            | none          | No              |
+| Integration | Real Docker on the local machine           | `integration` | Yes             |
+| E2E         | Full transfer path over SSH to a real host | `e2e`         | Yes + SSH       |
 
-### Run Commands
+## Run Commands
 
 ```bash
 # Unit only
@@ -28,42 +27,27 @@ go test -race -count=1 -v -timeout=120s ./...
 go test -race -count=1 -v -timeout=120s -tags=integration ./...
 
 # E2E against the real remote host
-go test -race -count=1 -v -timeout=120s -tags=e2e ./...
-
-# Full non-unit suite
-go test -race -count=1 -v -timeout=120s -tags='integration e2e' ./...
+GOCACHE=/tmp/ship-gocache go test -race -count=1 -v -timeout=120s -tags=e2e ./...
 ```
 
 Set E2E target configuration with environment variables:
 
 ```bash
-export SHIP_E2E_USER=deploy
-export SHIP_E2E_HOST=staging.example.com
+export SHIP_E2E_USER=root
+export SHIP_E2E_HOST=46.101.213.82
+# Optional if SSH defaults are not enough:
 export SHIP_E2E_KEY=~/.ssh/id_ed25519
 ```
 
 ## Integration Test Rules
 
-- Gate with build tag: `//go:build integration`
-- Use real Docker commands — no mocks for Docker
-- Clean up containers/images created during tests
+- Gate with `//go:build integration`
+- Use real Docker commands
+- Clean up registry containers and transfer tags when needed
 
 ## E2E Test Rules
 
-- Gate with build tag: `//go:build e2e`
-- Configure the SSH test host via `SHIP_E2E_USER`, `SHIP_E2E_HOST`, and `SHIP_E2E_KEY`
-- Expect Docker and SSH access to be available
-- Keep these tests out of the default `integration` tag
-
-## Testify Usage
-
-- Use `require` for preconditions and setup assertions (fail immediately)
-- Use `assert` for the actual test assertions when multiple checks make sense
-- Prefer `require.NoError(t, err)` over `if err != nil { t.Fatal(err) }`
-- Use `assert.Contains`, `assert.Equal`, `assert.ErrorContains` for clarity
-
-## What Not to Test
-
-- SSH tunnel reliability (infrastructure-dependent, E2E only)
-- Docker daemon behavior (trust Docker; test our invocation and parsing)
-- The `ssh` binary itself
+- Gate with `//go:build e2e`
+- Require a real SSH host and a reachable Docker daemon
+- `SHIP_E2E_KEY` is optional; tests may use the default SSH identity behavior
+- Skip cleanly when Docker or SSH prerequisites are unavailable

@@ -6,40 +6,54 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"syscall"
 	"time"
 )
 
 // BuildRemoteCommandArgs returns the argument slice for an SSH remote command execution.
-func BuildRemoteCommandArgs(keyPath, user, host, cmd string) []string {
-	return []string{
-		"-i", keyPath,
+func BuildRemoteCommandArgs(keyPath string, port int, user, host, cmd string) []string {
+	args := commonArgs(keyPath, port)
+	args = append(args,
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "BatchMode=yes",
 		"-o", "ConnectTimeout=5",
-		user + "@" + host,
+		user+"@"+host,
 		cmd,
-	}
+	)
+	return args
 }
 
 // BuildTunnelArgs returns the argument slice for a reverse SSH tunnel.
-func BuildTunnelArgs(keyPath, user, host string) []string {
-	return []string{
-		"-i", keyPath,
+func BuildTunnelArgs(keyPath string, port int, user, host string) []string {
+	args := commonArgs(keyPath, port)
+	args = append(args,
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "BatchMode=yes",
 		"-o", "ConnectTimeout=5",
 		"-o", "ExitOnForwardFailure=yes",
 		"-R", "5001:localhost:5001",
 		"-N",
-		user + "@" + host,
+		user+"@"+host,
+	)
+	return args
+}
+
+func commonArgs(keyPath string, port int) []string {
+	args := make([]string, 0, 4)
+	if keyPath != "" {
+		args = append(args, "-i", keyPath)
 	}
+	if port > 0 {
+		args = append(args, "-p", strconv.Itoa(port))
+	}
+	return args
 }
 
 // RunRemoteCommand executes a command on the remote host via SSH.
 // Returns stdout, stderr, exit code, and error.
-func RunRemoteCommand(keyPath, user, host, cmd string) (stdoutStr, stderrStr string, exitCode int, err error) {
-	args := BuildRemoteCommandArgs(keyPath, user, host, cmd)
+func RunRemoteCommand(keyPath string, port int, user, host, cmd string) (stdoutStr, stderrStr string, exitCode int, err error) {
+	args := BuildRemoteCommandArgs(keyPath, port, user, host, cmd)
 	c := exec.CommandContext(context.Background(), "ssh", args...)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -71,8 +85,8 @@ func (t *TunnelProcess) Exited() <-chan struct{} {
 
 // StartTunnel starts a reverse SSH tunnel as a background process.
 // Returns a TunnelProcess for lifecycle management.
-func StartTunnel(keyPath, user, host string) (*TunnelProcess, error) {
-	args := BuildTunnelArgs(keyPath, user, host)
+func StartTunnel(keyPath string, port int, user, host string) (*TunnelProcess, error) {
+	args := BuildTunnelArgs(keyPath, port, user, host)
 	c := exec.CommandContext(context.Background(), "ssh", args...)
 
 	if err := c.Start(); err != nil {

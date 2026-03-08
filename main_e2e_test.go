@@ -4,9 +4,7 @@ package main_test
 
 import (
 	"context"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -14,319 +12,122 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"ship/docker"
 	"ship/testenv"
 	"ship/testlock"
 )
 
-func setupComposeProject(t *testing.T) string {
+func setupLocalImage(t *testing.T, imageRef string) {
 	t.Helper()
-	dir := t.TempDir()
 
-	dockerfile := filepath.Join(dir, "Dockerfile")
-	require.NoError(t, os.WriteFile(dockerfile, []byte("FROM alpine:latest\nRUN echo hello\n"), 0o600))
+	pull := exec.CommandContext(context.Background(), "docker", "pull", "alpine:latest")
+	if out, err := pull.CombinedOutput(); err != nil {
+		t.Fatalf("failed to pull alpine: %v\n%s", err, string(out))
+	}
 
-	compose := filepath.Join(dir, "compose.yml")
-	content := `services:
-  web:
-    build:
-      context: .
-      platforms:
-        - linux/amd64
-    image: ship-test-web:latest
-    platform: linux/amd64
-  api:
-    build:
-      context: .
-      platforms:
-        - linux/amd64
-    image: ship-test-api:latest
-    platform: linux/amd64
-  redis:
-    image: redis:alpine
-`
-	require.NoError(t, os.WriteFile(compose, []byte(content), 0o600))
-
-	return compose
+	require.NoError(t, docker.TagImage("alpine:latest", imageRef))
 }
 
-func TestShip_AllFlags_PrintsSevenStages(t *testing.T) {
+func TestShip_PrintsFiveStages(t *testing.T) {
 	cfg := testenv.RequireE2EConfig(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
-	composePath := setupComposeProject(t)
+	imageRef := "ship-main-e2e:latest"
+	setupLocalImage(t, imageRef)
 
-	cmd := exec.CommandContext(context.Background(), binaryPath,
-		"--docker-compose", composePath,
-		"--user", cfg.User,
-		"--host", cfg.Host,
-		"--key", cfg.KeyPath,
-		"--command", "echo deployed",
-	)
+	args := []string{}
+	if cfg.KeyPath != "" {
+		args = append(args, "-i", cfg.KeyPath)
+	}
+	args = append(args, cfg.Address(), imageRef)
+
+	cmd := exec.CommandContext(context.Background(), binaryPath, args...)
 	out, err := cmd.Output()
-	require.NoError(t, err, "exit code should be 0")
+	require.NoError(t, err)
 
 	stdout := string(out)
 	lines := strings.Split(strings.TrimSpace(stdout), "\n")
 
-	// Filter to only stage progress lines (skip Docker build output).
 	var stageLines []string
-	stagePattern := regexp.MustCompile(`^\[(\d)/7\]`)
+	stagePattern := regexp.MustCompile(`^\[(\d)/5\]`)
 	for _, line := range lines {
 		if stagePattern.MatchString(line) {
 			stageLines = append(stageLines, line)
 		}
 	}
 
-	assert.Len(t, stageLines, 14, "expected 14 stage lines (7 starts + 7 completes)")
+	assert.Len(t, stageLines, 10, "expected 10 stage lines (5 starts + 5 completes)")
 
-	expectedOrder := []string{"1", "1", "2", "2", "3", "3", "4", "4", "5", "5", "6", "6", "7", "7"}
+	expectedOrder := []string{"1", "1", "2", "2", "3", "3", "4", "4", "5", "5"}
 	for i, line := range stageLines {
 		matches := stagePattern.FindStringSubmatch(line)
-		require.Len(t, matches, 2, "line %d did not match: %s", i, line)
+		require.Len(t, matches, 2)
 		assert.Equal(t, expectedOrder[i], matches[1])
 	}
 
-	// Contract rule 16: start messages end with "...".
-	for i := 0; i < len(stageLines); i += 2 {
-		assert.True(t, strings.HasSuffix(stageLines[i], "..."), "start line should end with ...: %s", stageLines[i])
-	}
-
-	// Contract rule 12: no ANSI codes in stage lines.
-	ansi := regexp.MustCompile(`\x1b\[`)
-	for _, line := range stageLines {
-		assert.False(t, ansi.MatchString(line), "stage line contains ANSI escape codes: %s", line)
-	}
-
-	// Contract rule 13: no emoji in stage lines.
-	emoji := regexp.MustCompile(`[\x{1F600}-\x{1F64F}]|[\x{1F300}-\x{1F5FF}]|[\x{1F680}-\x{1F6FF}]|[\x{1F1E0}-\x{1F1FF}]|[\x{2600}-\x{26FF}]|[\x{2700}-\x{27BF}]`)
-	for _, line := range stageLines {
-		assert.False(t, emoji.MatchString(line), "stage line contains emoji: %s", line)
-	}
-
-	// Verify build stage reports correct image count.
-	assert.Contains(t, stdout, "Build complete (2 images)")
-	assert.Contains(t, stdout, "Tag complete")
-
-	// Verify success summary is present.
 	assert.Contains(t, stdout, "Ship complete")
 	assert.Contains(t, stdout, "Host:     "+cfg.Host)
-	assert.Contains(t, stdout, "Status:   Success")
-
-	// Verify no transfer tags in summary.
-	summaryIdx := strings.Index(stdout, "Ship complete")
-	if summaryIdx >= 0 {
-		summary := stdout[summaryIdx:]
-		assert.NotContains(t, summary, "localhost:5001/")
-	}
-}
-
-func TestShip_NoBuildServices_FailsWithError(t *testing.T) {
-	cfg := testenv.RequireE2EConfig(t)
-	dir := t.TempDir()
-	compose := filepath.Join(dir, "compose.yml")
-	content := `services:
-  redis:
-    image: redis:alpine
-`
-	require.NoError(t, os.WriteFile(compose, []byte(content), 0o600))
-
-	cmd := exec.CommandContext(context.Background(), binaryPath,
-		"--docker-compose", compose,
-		"--user", cfg.User,
-		"--host", cfg.Host,
-		"--key", cfg.KeyPath,
-		"--command", "docker compose up -d",
-	)
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-
-	require.Error(t, err, "exit code should be non-zero")
-	assert.Contains(t, stderr.String(), "No images found after build")
+	assert.Contains(t, stdout, "Image:    "+imageRef)
+	assert.NotContains(t, stdout, "localhost:5001/")
 }
 
 func TestShip_BadKeyPath_FailsBeforeStages(t *testing.T) {
 	cfg := testenv.RequireE2EConfig(t)
-	composePath := setupComposeProject(t)
+	imageRef := "ship-main-bad-key:latest"
+	setupLocalImage(t, imageRef)
 
-	cmd := exec.CommandContext(context.Background(), binaryPath,
-		"--docker-compose", composePath,
-		"--user", cfg.User,
-		"--host", cfg.Host,
-		"--key", "/tmp/nonexistent-key-ship-test",
-		"--command", "echo deployed",
-	)
+	cmd := exec.CommandContext(context.Background(), binaryPath, "-i", "/tmp/nonexistent-key-ship-test", cfg.Address(), imageRef)
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 
-	require.Error(t, err, "exit code should be non-zero")
+	require.Error(t, err)
 	errOut := stderr.String()
 	assert.Contains(t, errOut, "SSH key file not found")
 	assert.Contains(t, errOut, "/tmp/nonexistent-key-ship-test")
-	assert.Contains(t, errOut, "--key")
-	// No stage lines should appear.
-	assert.NotContains(t, stdout.String(), "[1/7]")
+	assert.Contains(t, errOut, "-i")
+	assert.NotContains(t, stdout.String(), "[1/5]")
 }
 
 func TestShip_UnreachableHost_FailsBeforeStages(t *testing.T) {
 	cfg := testenv.RequireE2EConfig(t)
-	composePath := setupComposeProject(t)
+	imageRef := "ship-main-unreachable:latest"
+	setupLocalImage(t, imageRef)
 
-	cmd := exec.CommandContext(context.Background(), binaryPath,
-		"--docker-compose", composePath,
-		"--user", cfg.User,
-		"--host", "192.0.2.1",
-		"--key", cfg.KeyPath,
-		"--command", "echo deployed",
-	)
-	cmd.Env = append(os.Environ(), "SSH_AUTH_SOCK=") // Disable agent to force key-only auth.
-	var stdout, stderr strings.Builder
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-
-	require.Error(t, err, "exit code should be non-zero")
-	errOut := stderr.String()
-	assert.Contains(t, errOut, "SSH connection failed")
-	assert.Contains(t, errOut, "--host")
-	assert.Contains(t, errOut, "--key")
-	// No stage lines should appear.
-	assert.NotContains(t, stdout.String(), "[1/7]")
-}
-
-func TestShip_MissingComposeFile_FailsBeforeStages(t *testing.T) {
-	cfg := testenv.RequireE2EConfig(t)
-	composePath := setupComposeProject(t)
-
-	composeArg := composePath + ",/tmp/nonexistent-compose.yml"
-	cmd := exec.CommandContext(context.Background(), binaryPath,
-		"--docker-compose", composeArg,
-		"--user", cfg.User,
-		"--host", cfg.Host,
-		"--key", cfg.KeyPath,
-		"--command", "echo deployed",
-	)
-	var stdout, stderr strings.Builder
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-
-	require.Error(t, err, "exit code should be non-zero")
-	errOut := stderr.String()
-	assert.Contains(t, errOut, "Compose file not found: /tmp/nonexistent-compose.yml")
-	// No stage lines should appear.
-	assert.NotContains(t, stdout.String(), "[1/7]")
-}
-
-func TestShip_EmptyCommand_FailsBeforeStages(t *testing.T) {
-	cfg := testenv.RequireE2EConfig(t)
-	composePath := setupComposeProject(t)
-
-	cmd := exec.CommandContext(context.Background(), binaryPath,
-		"--docker-compose", composePath,
-		"--user", cfg.User,
-		"--host", cfg.Host,
-		"--key", cfg.KeyPath,
-		"--command", "",
-	)
-	var stdout, stderr strings.Builder
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-
-	require.Error(t, err, "exit code should be non-zero")
-	errOut := stderr.String()
-	assert.Contains(t, errOut, "Empty --command flag")
-	assert.Contains(t, errOut, "provide the command to run on the remote host")
-	// No stage lines should appear.
-	assert.NotContains(t, stdout.String(), "[1/7]")
-}
-
-func TestShip_MultiFileCompose_E2E(t *testing.T) {
-	cfg := testenv.RequireE2EConfig(t)
-	testlock.Port5001(t)
-	testlock.StopRegistry(t)
-	t.Cleanup(func() { testlock.StopRegistry(t) })
-
-	dir := t.TempDir()
-	dockerfile := filepath.Join(dir, "Dockerfile")
-	require.NoError(t, os.WriteFile(dockerfile, []byte("FROM alpine:latest\nRUN echo hello\n"), 0o600))
-
-	base := filepath.Join(dir, "compose.yml")
-	baseContent := `services:
-  web:
-    build:
-      context: .
-      platforms:
-        - linux/amd64
-    image: ship-mfe2e-web:latest
-    platform: linux/amd64
-  redis:
-    image: redis:alpine
-`
-	require.NoError(t, os.WriteFile(base, []byte(baseContent), 0o600))
-
-	override := filepath.Join(dir, "compose.prod.yml")
-	overrideContent := `services:
-  web:
-    environment:
-      - NODE_ENV=production
-`
-	require.NoError(t, os.WriteFile(override, []byte(overrideContent), 0o600))
-
-	composeArg := base + "," + override
-	cmd := exec.CommandContext(context.Background(), binaryPath,
-		"--docker-compose", composeArg,
-		"--user", cfg.User,
-		"--host", cfg.Host,
-		"--key", cfg.KeyPath,
-		"--command", "echo deployed",
-	)
-	out, err := cmd.Output()
-	require.NoError(t, err, "exit code should be 0, stderr: %s", string(out))
-
-	stdout := string(out)
-
-	// All 7 stages should complete.
-	stagePattern := regexp.MustCompile(`\[\d/7\]`)
-	assert.True(t, stagePattern.MatchString(stdout))
-
-	// Success summary shows original image name, not transfer tag.
-	assert.Contains(t, stdout, "Ship complete")
-	assert.Contains(t, stdout, "ship-mfe2e-web:latest")
-	assert.NotContains(t, stdout, "redis")
-
-	// Build reports 1 image (only web has build key).
-	assert.Contains(t, stdout, "Build complete (1 images)")
-}
-
-func TestShip_TransferTagsExist(t *testing.T) {
-	cfg := testenv.RequireE2EConfig(t)
-	testlock.Port5001(t)
-	testlock.StopRegistry(t)
-	t.Cleanup(func() { testlock.StopRegistry(t) })
-	composePath := setupComposeProject(t)
-
-	cmd := exec.CommandContext(context.Background(), binaryPath,
-		"--docker-compose", composePath,
-		"--user", cfg.User,
-		"--host", cfg.Host,
-		"--key", cfg.KeyPath,
-		"--command", "echo deployed",
-	)
-	out, err := cmd.CombinedOutput()
-	require.NoError(t, err, "ship should succeed: %s", string(out))
-
-	// Verify transfer tags were created.
-	for _, img := range []string{"localhost:5001/ship-test-web:latest", "localhost:5001/ship-test-api:latest"} {
-		inspect := exec.CommandContext(context.Background(), "docker", "image", "inspect", img)
-		require.NoError(t, inspect.Run(), "transfer tag should exist: %s", img)
+	args := []string{}
+	if cfg.KeyPath != "" {
+		args = append(args, "-i", cfg.KeyPath)
 	}
+	args = append(args, "root@192.0.2.1", imageRef)
 
-	// Verify image-only service was NOT tagged.
-	inspect := exec.CommandContext(context.Background(), "docker", "image", "inspect", "localhost:5001/redis:alpine")
-	assert.Error(t, inspect.Run(), "redis should not have a transfer tag")
+	cmd := exec.CommandContext(context.Background(), binaryPath, args...)
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	require.Error(t, err)
+	assert.Contains(t, stderr.String(), "SSH connection failed")
+	assert.NotContains(t, stdout.String(), "[1/5]")
+}
+
+func TestShip_MissingLocalImage_FailsBeforeStages(t *testing.T) {
+	cfg := testenv.RequireE2EConfig(t)
+	args := []string{}
+	if cfg.KeyPath != "" {
+		args = append(args, "-i", cfg.KeyPath)
+	}
+	args = append(args, cfg.Address(), "ship-main-missing:latest")
+
+	cmd := exec.CommandContext(context.Background(), binaryPath, args...)
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	require.Error(t, err)
+	assert.Contains(t, stderr.String(), "local image not found: ship-main-missing:latest")
+	assert.NotContains(t, stdout.String(), "[1/5]")
 }

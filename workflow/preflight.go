@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 
 	"ship/cli"
+	"ship/docker"
+	shipssh "ship/ssh"
 )
 
 // Preflight runs all preflight checks in sequence before the stage pipeline.
@@ -17,19 +19,16 @@ func Preflight(cfg cli.Config) error {
 	if err := checkDocker(); err != nil {
 		return err
 	}
-	if err := checkDockerCompose(); err != nil {
-		return err
-	}
 	if err := checkSSH(); err != nil {
 		return err
 	}
 	if err := checkKeyFile(cfg.KeyPath); err != nil {
 		return err
 	}
-	if err := checkComposeFiles(cfg.ComposeFiles); err != nil {
+	if err := checkLocalImage(cfg.Image); err != nil {
 		return err
 	}
-	if err := checkSSHConnectivity(cfg.KeyPath, cfg.User, cfg.Host); err != nil {
+	if err := checkSSHConnectivity(cfg); err != nil {
 		return err
 	}
 	return nil
@@ -38,24 +37,13 @@ func Preflight(cfg cli.Config) error {
 // checkDocker verifies docker is on PATH and responds.
 func checkDocker() error {
 	if _, err := exec.LookPath("docker"); err != nil {
-		return errors.New("Docker is not installed or not in PATH") //nolint:staticcheck // user-facing message per DESIGN.md spec
+		return errors.New("docker is not installed or not in PATH")
 	}
 	cmd := exec.CommandContext(context.Background(), "docker", "version")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	if err := cmd.Run(); err != nil {
-		return errors.New("Docker is not installed or not in PATH") //nolint:staticcheck // user-facing message per DESIGN.md spec
-	}
-	return nil
-}
-
-// checkDockerCompose verifies docker compose V2 plugin is available.
-func checkDockerCompose() error {
-	cmd := exec.CommandContext(context.Background(), "docker", "compose", "version")
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker compose (V2) is required — upgrade Docker Compose or install the compose plugin")
+		return errors.New("docker is not installed or not in PATH")
 	}
 	return nil
 }
@@ -69,52 +57,38 @@ func checkSSH() error {
 }
 
 // checkKeyFile verifies the SSH key file exists and is readable via os.Stat.
+// Empty means the user chose the default SSH identity behavior.
 func checkKeyFile(keyPath string) error {
 	if keyPath == "" {
-		return fmt.Errorf("SSH key file not found: %s — verify the --key path", keyPath)
+		return nil
 	}
+
 	cleanPath := filepath.Clean(keyPath)
-	info, err := os.Stat(cleanPath) //nolint:gosec // keyPath is user-provided CLI flag, path traversal is expected
+	info, err := os.Stat(cleanPath) //nolint:gosec // keyPath is user-provided CLI input, path traversal is expected
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("SSH key file not found: %s — verify the --key path", keyPath)
+			return fmt.Errorf("SSH key file not found: %s — verify the -i path", keyPath)
 		}
-		return fmt.Errorf("Cannot read SSH key file: %s — check file permissions", keyPath) //nolint:staticcheck // user-facing message per DESIGN.md spec
+		return fmt.Errorf("cannot read SSH key file: %s — check file permissions", keyPath)
 	}
 	if info.IsDir() {
-		return fmt.Errorf("SSH key file not found: %s — verify the --key path", keyPath)
+		return fmt.Errorf("SSH key file not found: %s — verify the -i path", keyPath)
 	}
 	return nil
 }
 
-// checkComposeFiles verifies each compose file path exists.
-func checkComposeFiles(paths []string) error {
-	for _, p := range paths {
-		cleanPath := filepath.Clean(p)
-		if _, err := os.Stat(cleanPath); err != nil { //nolint:gosec // compose path is user-provided CLI flag, path traversal is expected
-			if os.IsNotExist(err) {
-				return fmt.Errorf("Compose file not found: %s", p) //nolint:staticcheck // user-facing message per DESIGN.md spec
-			}
-			return fmt.Errorf("Cannot read compose file: %s — check file permissions", p) //nolint:staticcheck // user-facing message per DESIGN.md spec
-		}
-	}
-	return nil
+func checkLocalImage(imageRef string) error {
+	return docker.ImageExists(imageRef)
 }
 
 // checkSSHConnectivity tests SSH connectivity to the remote host.
-func checkSSHConnectivity(keyPath, user, host string) error {
-	cmd := exec.CommandContext(context.Background(), "ssh",
-		"-i", keyPath,
-		"-o", "ConnectTimeout=10",
-		"-o", "StrictHostKeyChecking=accept-new",
-		"-o", "BatchMode=yes",
-		user+"@"+host,
-		"true",
-	)
+func checkSSHConnectivity(cfg cli.Config) error {
+	args := shipssh.BuildRemoteCommandArgs(cfg.KeyPath, cfg.Port, cfg.User, cfg.Host, "true")
+	cmd := exec.CommandContext(context.Background(), "ssh", args...)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("SSH connection failed — verify --host and --key")
+		return fmt.Errorf("SSH connection failed — verify the target and SSH credentials")
 	}
 	return nil
 }

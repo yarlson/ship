@@ -7,9 +7,9 @@ import (
 	"ship/progress"
 )
 
-// Registry executes Stage 3: ensure a local registry is running on :5001.
+// Registry executes Stage 2: ensure a local registry is running on :5001.
 func Registry() error {
-	progress.StageStart(3, "Starting local registry")
+	progress.StageStart(2, "Starting local registry")
 
 	running, err := docker.CheckRegistryRunning()
 	if err != nil {
@@ -30,6 +30,6 @@ func Registry() error {
 		}
 	}
 
-	progress.StageComplete(3, "Registry ready")
+	progress.StageComplete(2, "Registry ready")
 	return nil
 }
