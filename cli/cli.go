@@ -10,7 +10,7 @@ import (
 
 // Config holds the parsed CLI arguments.
 type Config struct {
-	Image   string
+	Images  []string
 	User    string
 	Host    string
 	KeyPath string
@@ -18,10 +18,10 @@ type Config struct {
 }
 
 // HelpText is the complete help output printed when --help is passed.
-const HelpText = `ship — transfer a local Docker image to a remote host over SSH
+const HelpText = `ship — transfer local Docker images to a remote host over SSH
 
 Usage:
-  ship [flags] <user@host> <image[:tag]>
+  ship [flags] <user@host> <image[:tag]> [<image[:tag]>...]
 
 Flags:
   -i, --identity-file <path>  Path to SSH private key file
@@ -29,11 +29,12 @@ Flags:
 
 Examples:
   ship root@10.0.0.1 app:latest
+  ship root@10.0.0.1 ship-test-api:latest traefik:v3
   ship -i ~/.ssh/id_ed25519 deploy@staging.example.com app:latest
-  ship -i ~/.ssh/id_ed25519 -p 2222 deploy@staging.example.com ghcr.io/acme/app:dev
+  ship -i ~/.ssh/id_ed25519 -p 2222 deploy@staging.example.com ghcr.io/acme/app:dev redis:7
 `
 
-const usageLine = "Usage: ship [-i <path>] [-p <port>] <user@host> <image[:tag]>"
+const usageLine = "Usage: ship [-i <path>] [-p <port>] <user@host> <image[:tag]> [<image[:tag]>...]"
 
 // Parse parses CLI args and returns a Config.
 // Returns flag.ErrHelp when --help is requested.
@@ -70,10 +71,6 @@ func Parse(args []string) (Config, error) {
 		return Config{}, fmt.Errorf("missing required arguments: %s\n%s", strings.Join(missing, ", "), usageLine)
 	}
 
-	if len(positional) > 2 {
-		return Config{}, fmt.Errorf("unexpected arguments: %s\n%s", strings.Join(positional[2:], ", "), usageLine)
-	}
-
 	user, host, err := parseTarget(positional[0])
 	if err != nil {
 		return Config{}, err
@@ -81,7 +78,7 @@ func Parse(args []string) (Config, error) {
 
 	cfg.User = user
 	cfg.Host = host
-	cfg.Image = positional[1]
+	cfg.Images = append([]string(nil), positional[1:]...)
 
 	return cfg, nil
 }

@@ -1,6 +1,6 @@
 # ship
 
-Transfer a local Docker image to a remote host over SSH, without setting up a remote registry.
+Transfer local Docker images to a remote host over SSH, without setting up a remote registry.
 
 `ship` is for the annoying middle ground where:
 
@@ -9,11 +9,11 @@ Transfer a local Docker image to a remote host over SSH, without setting up a re
 - building on the server is the wrong move
 - Docker Hub or a private registry feels like extra ceremony
 
-`ship` does one job: move a single image to a remote host through a local registry exposed over an SSH reverse tunnel, then restore the original tag on the remote side.
+`ship` does one job: move one or more local images to a remote host through a local registry exposed over an SSH reverse tunnel, then restore the original tags on the remote side.
 
 ## What It Does
 
-One `ship` run does this:
+One `ship` run does this for each image:
 
 1. verifies the local image exists
 2. tags it as `localhost:5001/<image>`
@@ -37,15 +37,16 @@ If you want to restart containers after the transfer, do that separately.
 ## Usage
 
 ```bash
-ship [-i key] [-p port] user@host image[:tag]
+ship [-i key] [-p port] user@host image[:tag] [image[:tag]...]
 ```
 
 Examples:
 
 ```bash
 ship root@10.0.0.1 app:latest
+ship root@46.101.213.82 ship-test-api:latest traefik:v3
 ship -i ~/.ssh/id_ed25519 deploy@staging.example.com app:latest
-ship -i ~/.ssh/id_ed25519 -p 2222 deploy@staging.example.com ghcr.io/acme/app:dev
+ship -i ~/.ssh/id_ed25519 -p 2222 deploy@staging.example.com ghcr.io/acme/app:dev redis:7
 ```
 
 ## Requirements
@@ -54,7 +55,7 @@ Local machine:
 
 - Docker
 - `ssh`
-- the image already present locally
+- the image or images already present locally
 
 Remote host:
 
@@ -71,7 +72,7 @@ Before stage 1 starts, `ship` verifies:
 - Docker is available locally
 - `ssh` is available locally
 - the SSH key exists if `-i` was provided
-- the local image exists
+- each local image exists
 - SSH connectivity to the remote host works
 
 If preflight passes, progress is printed in a consistent `[N/5]` format.

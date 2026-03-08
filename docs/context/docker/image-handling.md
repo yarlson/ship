@@ -10,6 +10,10 @@ Converts an original image ref into the temporary transfer tag:
 app:latest -> localhost:5001/app:latest
 ```
 
+### `TransferTags(imageRefs []string) []string`
+
+Converts multiple original image refs into transfer tags in the same order.
+
 ### `ImageExists(imageRef string) error`
 
 Runs:
@@ -45,4 +49,4 @@ This module does not:
 
 - parse Docker Compose config
 - build Docker images
-- discover multiple service images
+- discover images automatically

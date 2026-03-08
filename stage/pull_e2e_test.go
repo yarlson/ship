@@ -18,13 +18,15 @@ func TestPull_PullsAndRestoresImage(t *testing.T) {
 	t.Cleanup(func() { testlock.StopRegistry(t) })
 
 	cfg := testSSHConfig(t)
-	original := "ship-pulltest:latest"
-	transfer := "localhost:5001/ship-pulltest:latest"
+	originals := []string{"ship-pulltest:latest", "ship-pulltest-proxy:v3"}
+	transfers := []string{"localhost:5001/ship-pulltest:latest", "localhost:5001/ship-pulltest-proxy:v3"}
 
 	captureOutput(func() {
 		require.NoError(t, Registry())
 	})
-	require.NoError(t, tagAndPushTestImage(t, "alpine:latest", transfer))
+	for _, transfer := range transfers {
+		require.NoError(t, tagAndPushTestImage(t, "alpine:latest", transfer))
+	}
 
 	var tp *ssh.TunnelProcess
 	captureOutput(func() {
@@ -37,7 +39,7 @@ func TestPull_PullsAndRestoresImage(t *testing.T) {
 	})
 
 	out := captureOutput(func() {
-		err := Pull(cfg, original, transfer)
+		err := Pull(cfg, originals, transfers)
 		require.NoError(t, err)
 	})
 
@@ -60,7 +62,7 @@ func TestPull_FailsWhenImageUnavailable(t *testing.T) {
 		ssh.StopTunnel(tp) //nolint:errcheck // best-effort cleanup
 	})
 
-	err := Pull(cfg, "nonexistent:latest", "localhost:5001/nonexistent-image-that-does-not-exist:latest")
+	err := Pull(cfg, []string{"nonexistent:latest"}, []string{"localhost:5001/nonexistent-image-that-does-not-exist:latest"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to pull image on remote host")
 }

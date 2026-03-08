@@ -2,22 +2,22 @@
 
 ## What It Is
 
-Ship is a Go CLI that transfers one existing local Docker image to a remote host over SSH.
+Ship is a Go CLI that transfers one or more existing local Docker images to a remote host over SSH.
 
 It does not build images.
 It does not read Docker Compose files.
 It does not run a deploy hook on the remote host.
 
-Its only job is to make sure an image that exists locally ends up on the remote host under the same original tag.
+Its only job is to make sure images that exist locally end up on the remote host under the same original tags.
 
 ## CLI Shape
 
 ```bash
-ship [-i key] [-p port] user@host image[:tag]
+ship [-i key] [-p port] user@host image[:tag] [image[:tag]...]
 ```
 
 - `user@host` identifies the SSH target
-- `image[:tag]` identifies the local Docker image to transfer
+- `image[:tag]` arguments identify the local Docker images to transfer
 - `-i` optionally selects an SSH identity file
 - `-p` optionally selects a non-default SSH port
 
@@ -25,7 +25,7 @@ ship [-i key] [-p port] user@host image[:tag]
 
 Ship runs these stages in order:
 
-1. tag the local image as `localhost:5001/<image>`
+1. tag each local image as `localhost:5001/<image>`
 2. ensure a local registry is running on `:5001`
 3. push the transfer tag to that local registry
 4. open an SSH reverse tunnel so the remote host can reach the local registry
@@ -38,7 +38,7 @@ Before stage 1 starts, Ship checks:
 - Docker is available locally
 - `ssh` is available locally
 - the SSH key exists if `-i` was provided
-- the local image exists
+- each local image exists
 - SSH connectivity to the target works
 
 ## Main Modules
@@ -52,7 +52,7 @@ Before stage 1 starts, Ship checks:
 
 ## Capabilities
 
-- transfer one local image to one remote host
+- transfer one or more local images to one remote host
 - preserve the original image tag on the remote side
 - reuse SSH instead of requiring a hosted or remote registry
 - fail fast when local prerequisites or SSH access are missing

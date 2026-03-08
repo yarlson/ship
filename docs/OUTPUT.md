@@ -35,11 +35,11 @@ Error: Port 5001 already in use — stop the existing process or free the port
 ```
 Ship complete
   Host:     <host>
-  Image:    <original image tag>
+  Images:   <original image tags, comma-separated>
   Status:   Success
 ```
 
-Labels are 10 chars wide including colon. The summary shows the original image ref, never the `localhost:5001/` transfer tag.
+Labels are 10 chars wide including colon. The summary shows the original image refs, never the `localhost:5001/` transfer tags.
 
 ## Hard Rules
 

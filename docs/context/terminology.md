@@ -1,10 +1,10 @@
 # Terminology
 
-**CLI config** — Parsed command-line input stored in `cli.Config`. Contains `Image`, `User`, `Host`, optional `KeyPath`, and `Port`.
+**CLI config** — Parsed command-line input stored in `cli.Config`. Contains `Images`, `User`, `Host`, optional `KeyPath`, and `Port`.
 
-**Original image** — The image reference the user passed to `ship`, for example `app:latest`.
+**Original image** — One of the image references the user passed to `ship`, for example `app:latest`.
 
-**Transfer tag** — The temporary local-registry form of the image ref, for example `localhost:5001/app:latest`.
+**Transfer tag** — The temporary local-registry form of an image ref, for example `localhost:5001/app:latest`.
 
 **Local registry** — A registry container running locally and exposed on port `5001`. Used only as the transfer bridge.
 
@@ -14,6 +14,6 @@
 
 **Stage** — One of the 5 ordered workflow steps: tag, registry, push, tunnel, pull/restore.
 
-**Preflight** — The checks that run before the first stage: Docker, SSH, optional key path, local image existence, and SSH connectivity.
+**Preflight** — The checks that run before the first stage: Docker, SSH, optional key path, local image existence for every requested image, and SSH connectivity.
 
 **Progress output** — The `[N/5]` lines printed by the workflow to show stage start and completion.

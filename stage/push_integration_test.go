@@ -38,10 +38,12 @@ func TestRegistryAndPush_HappyPath(t *testing.T) {
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
 
-	original := "ship-inttest-push:latest"
-	transfer := "localhost:5001/ship-inttest-push:latest"
-	ensureLocalImage(t, original)
-	require.NoError(t, Tag(original, transfer))
+	originals := []string{"ship-inttest-push:latest", "ship-inttest-proxy:v3"}
+	transfers := []string{"localhost:5001/ship-inttest-push:latest", "localhost:5001/ship-inttest-proxy:v3"}
+	for _, original := range originals {
+		ensureLocalImage(t, original)
+	}
+	require.NoError(t, Tag(originals, transfers))
 
 	captureOutput(func() {
 		err := Registry()
@@ -49,7 +51,7 @@ func TestRegistryAndPush_HappyPath(t *testing.T) {
 	})
 
 	out := captureOutput(func() {
-		err := Push(transfer)
+		err := Push(transfers)
 		require.NoError(t, err)
 	})
 
@@ -58,6 +60,8 @@ func TestRegistryAndPush_HappyPath(t *testing.T) {
 
 	tags := queryRegistryTags(t, "ship-inttest-push")
 	assert.Contains(t, tags, "latest")
+	tags = queryRegistryTags(t, "ship-inttest-proxy")
+	assert.Contains(t, tags, "v3")
 }
 
 func TestPush_FailsOnBadImageRef(t *testing.T) {
@@ -70,7 +74,7 @@ func TestPush_FailsOnBadImageRef(t *testing.T) {
 		require.NoError(t, Registry())
 	})
 
-	err := Push("localhost:5001/nonexistent:latest")
+	err := Push([]string{"localhost:5001/nonexistent:latest"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "localhost:5001/nonexistent:latest")
 }

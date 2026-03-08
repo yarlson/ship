@@ -3,7 +3,7 @@
 ## Product Boundaries
 
 - Ship is an image transfer tool, not a deployment orchestrator.
-- Keep the scope at one local image to one remote host.
+- Keep the scope at one or more local images to one remote host.
 - Do not add Docker Compose parsing or build orchestration back into the core path.
 - Do not add arbitrary remote command execution as part of the transfer workflow.
 
@@ -31,5 +31,5 @@
 ## Output Conventions
 
 - Errors are lowercase Go error strings; `main.go` adds the `Error:` prefix.
-- Success summaries show the original image ref, never the `localhost:5001/` transfer tag.
+- Success summaries show the original image refs, never the `localhost:5001/` transfer tags.
 - No secrets in output. SSH key paths are acceptable; key contents are not.

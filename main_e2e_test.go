@@ -33,14 +33,17 @@ func TestShip_PrintsFiveStages(t *testing.T) {
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
-	imageRef := "ship-main-e2e:latest"
-	setupLocalImage(t, imageRef)
+	imageRefs := []string{"ship-main-e2e:latest", "traefik:v3"}
+	for _, imageRef := range imageRefs {
+		setupLocalImage(t, imageRef)
+	}
 
 	args := []string{}
 	if cfg.KeyPath != "" {
 		args = append(args, "-i", cfg.KeyPath)
 	}
-	args = append(args, cfg.Address(), imageRef)
+	args = append(args, cfg.Address())
+	args = append(args, imageRefs...)
 
 	cmd := exec.CommandContext(context.Background(), binaryPath, args...)
 	out, err := cmd.Output()
@@ -68,7 +71,7 @@ func TestShip_PrintsFiveStages(t *testing.T) {
 
 	assert.Contains(t, stdout, "Ship complete")
 	assert.Contains(t, stdout, "Host:     "+cfg.Host)
-	assert.Contains(t, stdout, "Image:    "+imageRef)
+	assert.Contains(t, stdout, "Images:   "+strings.Join(imageRefs, ", "))
 	assert.NotContains(t, stdout, "localhost:5001/")
 }
 

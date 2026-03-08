@@ -7,7 +7,7 @@
 1. Docker is installed and responsive
 2. `ssh` is installed
 3. the SSH key path exists if `cfg.KeyPath` is not empty
-4. the local Docker image exists
+4. each local Docker image exists
 5. SSH connectivity to `cfg.User@cfg.Host` works
 
 Preflight stops on the first failure.

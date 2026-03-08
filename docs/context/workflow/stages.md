@@ -6,9 +6,9 @@ The workflow runs 5 stages after preflight succeeds.
 
 **Message:** `[1/5] Tagging image for transfer...` → `[1/5] Tag complete`
 
-- input: original image ref
-- action: create `localhost:5001/<image>` transfer tag
-- implementation: `stage.Tag(original, transfer)`
+- input: original image refs
+- action: create `localhost:5001/<image>` transfer tags
+- implementation: `stage.Tag(originals, transfers)`
 
 ## Stage 2: Registry
 
@@ -22,9 +22,9 @@ The workflow runs 5 stages after preflight succeeds.
 
 **Message:** `[3/5] Pushing image to local registry...` → `[3/5] Push complete`
 
-- input: transfer tag
-- action: push the transfer tag into the local registry
-- implementation: `stage.Push(transfer)`
+- input: transfer tags
+- action: push the transfer tags into the local registry
+- implementation: `stage.Push(transfers)`
 
 ## Stage 4: Tunnel
 
@@ -38,11 +38,11 @@ The workflow runs 5 stages after preflight succeeds.
 
 **Message:** `[5/5] Pulling and restoring image on remote host...` → `[5/5] Pull and restore complete`
 
-- input: SSH config, original image ref, transfer tag
+- input: SSH config, original image refs, transfer tags
 - action:
-  - run remote `docker pull <transfer>`
-  - run remote `docker tag <transfer> <original>`
-- implementation: `stage.Pull(cfg, original, transfer)`
+  - run remote `docker pull <transfer>` for each image
+  - run remote `docker tag <transfer> <original>` for each image
+- implementation: `stage.Pull(cfg, originals, transfers)`
 
 ## Cleanup
 

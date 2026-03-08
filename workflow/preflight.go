@@ -25,7 +25,7 @@ func Preflight(cfg cli.Config) error {
 	if err := checkKeyFile(cfg.KeyPath); err != nil {
 		return err
 	}
-	if err := checkLocalImage(cfg.Image); err != nil {
+	if err := checkLocalImages(cfg.Images); err != nil {
 		return err
 	}
 	if err := checkSSHConnectivity(cfg); err != nil {
@@ -77,8 +77,14 @@ func checkKeyFile(keyPath string) error {
 	return nil
 }
 
-func checkLocalImage(imageRef string) error {
-	return docker.ImageExists(imageRef)
+func checkLocalImages(imageRefs []string) error {
+	for _, imageRef := range imageRefs {
+		if err := docker.ImageExists(imageRef); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // checkSSHConnectivity tests SSH connectivity to the remote host.

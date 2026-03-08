@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"fmt"
+	"strings"
 
 	"ship/cli"
 	"ship/docker"
@@ -12,9 +13,9 @@ import (
 
 // State holds shared mutable state passed through stages.
 type State struct {
-	OriginalImage string
-	TransferImage string
-	TunnelCmd     *ssh.TunnelProcess
+	OriginalImages []string
+	TransferImages []string
+	TunnelCmd      *ssh.TunnelProcess
 }
 
 // Run executes preflight checks followed by the 5-stage workflow.
@@ -24,11 +25,11 @@ func Run(cfg cli.Config) error {
 	}
 
 	state := &State{
-		OriginalImage: cfg.Image,
-		TransferImage: docker.TransferTag(cfg.Image),
+		OriginalImages: append([]string(nil), cfg.Images...),
+		TransferImages: docker.TransferTags(cfg.Images),
 	}
 
-	if err := stage.Tag(state.OriginalImage, state.TransferImage); err != nil {
+	if err := stage.Tag(state.OriginalImages, state.TransferImages); err != nil {
 		return wrapStageErr(1, "Tag", err)
 	}
 
@@ -36,7 +37,7 @@ func Run(cfg cli.Config) error {
 		return wrapStageErr(2, "Registry", err)
 	}
 
-	if err := stage.Push(state.TransferImage); err != nil {
+	if err := stage.Push(state.TransferImages); err != nil {
 		return wrapStageErr(3, "Push", err)
 	}
 
@@ -47,7 +48,7 @@ func Run(cfg cli.Config) error {
 	state.TunnelCmd = tp
 	defer cleanupTunnel(state)
 
-	if err := stage.Pull(cfg, state.OriginalImage, state.TransferImage); err != nil {
+	if err := stage.Pull(cfg, state.OriginalImages, state.TransferImages); err != nil {
 		return wrapStageErr(5, "Pull", err)
 	}
 
@@ -68,7 +69,7 @@ func wrapStageErr(stageNum int, name string, err error) *StageError {
 func printSummary(cfg cli.Config, state *State) {
 	fmt.Fprintln(progress.Writer, "Ship complete")
 	fmt.Fprintf(progress.Writer, "  Host:     %s\n", cfg.Host)
-	fmt.Fprintf(progress.Writer, "  Image:    %s\n", state.OriginalImage)
+	fmt.Fprintf(progress.Writer, "  Images:   %s\n", strings.Join(state.OriginalImages, ", "))
 	fmt.Fprintln(progress.Writer, "  Status:   Success")
 }
 

@@ -10,6 +10,13 @@ func TestTransferTag(t *testing.T) {
 	assert.Equal(t, "localhost:5001/app:latest", TransferTag("app:latest"))
 }
 
+func TestTransferTags(t *testing.T) {
+	assert.Equal(t,
+		[]string{"localhost:5001/app:latest", "localhost:5001/traefik:v3"},
+		TransferTags([]string{"app:latest", "traefik:v3"}),
+	)
+}
+
 func TestTransferTag_WithExistingRegistry(t *testing.T) {
 	assert.Equal(t, "localhost:5001/ghcr.io/org/app:v1", TransferTag("ghcr.io/org/app:v1"))
 }

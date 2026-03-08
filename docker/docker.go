@@ -12,6 +12,16 @@ func TransferTag(imageRef string) string {
 	return "localhost:5001/" + imageRef
 }
 
+// TransferTags returns the localhost:5001/ prefixed tags for image references.
+func TransferTags(imageRefs []string) []string {
+	transferRefs := make([]string, 0, len(imageRefs))
+	for _, imageRef := range imageRefs {
+		transferRefs = append(transferRefs, TransferTag(imageRef))
+	}
+
+	return transferRefs
+}
+
 // ImageExists verifies that a local image reference exists.
 func ImageExists(imageRef string) error {
 	cmd := exec.CommandContext(context.Background(), "docker", "image", "inspect", imageRef)

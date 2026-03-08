@@ -15,18 +15,18 @@ func TestParse_DefaultSSHStyleArgs(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "deploy", cfg.User)
 	assert.Equal(t, "10.0.0.5", cfg.Host)
-	assert.Equal(t, "app:latest", cfg.Image)
+	assert.Equal(t, []string{"app:latest"}, cfg.Images)
 	assert.Equal(t, "", cfg.KeyPath)
 	assert.Equal(t, 22, cfg.Port)
 }
 
 func TestParse_WithIdentityAndPort(t *testing.T) {
-	cfg, err := Parse([]string{"-i", "~/.ssh/id_ed25519", "-p", "2222", "root@example.com", "ghcr.io/acme/app:dev"})
+	cfg, err := Parse([]string{"-i", "~/.ssh/id_ed25519", "-p", "2222", "root@example.com", "ghcr.io/acme/app:dev", "redis:7"})
 
 	require.NoError(t, err)
 	assert.Equal(t, "root", cfg.User)
 	assert.Equal(t, "example.com", cfg.Host)
-	assert.Equal(t, "ghcr.io/acme/app:dev", cfg.Image)
+	assert.Equal(t, []string{"ghcr.io/acme/app:dev", "redis:7"}, cfg.Images)
 	assert.Equal(t, "~/.ssh/id_ed25519", cfg.KeyPath)
 	assert.Equal(t, 2222, cfg.Port)
 }
@@ -53,12 +53,11 @@ func TestParse_InvalidTarget(t *testing.T) {
 	assert.Equal(t, "invalid target: example.com — expected <user@host>", err.Error())
 }
 
-func TestParse_UnexpectedArguments(t *testing.T) {
-	_, err := Parse([]string{"deploy@example.com", "app:latest", "extra"})
+func TestParse_MultipleImages(t *testing.T) {
+	cfg, err := Parse([]string{"deploy@example.com", "app:latest", "traefik:v3", "redis:7"})
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unexpected arguments: extra")
-	assert.Contains(t, err.Error(), usageLine)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"app:latest", "traefik:v3", "redis:7"}, cfg.Images)
 }
 
 func TestParse_EmptyIdentityFlag(t *testing.T) {
@@ -82,9 +81,9 @@ func TestParse_Help(t *testing.T) {
 }
 
 func TestHelpText_MatchesDesignSpec(t *testing.T) {
-	assert.Contains(t, HelpText, "ship — transfer a local Docker image to a remote host over SSH")
+	assert.Contains(t, HelpText, "ship — transfer local Docker images to a remote host over SSH")
 	assert.Contains(t, HelpText, "Usage:")
-	assert.Contains(t, HelpText, "<user@host> <image[:tag]>")
+	assert.Contains(t, HelpText, "<user@host> <image[:tag]> [<image[:tag]>...]")
 	assert.Contains(t, HelpText, "-i, --identity-file <path>")
 	assert.Contains(t, HelpText, "-p, --port <port>")
 	assert.Contains(t, HelpText, "Examples:")

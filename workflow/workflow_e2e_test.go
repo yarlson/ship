@@ -52,11 +52,13 @@ func setupLocalImage(t *testing.T, imageRef string) {
 }
 
 func TestPreflight_PassesWithValidConfig(t *testing.T) {
-	imageRef := "ship-wftest-preflight:latest"
-	setupLocalImage(t, imageRef)
+	imageRefs := []string{"ship-wftest-preflight:latest", "ship-wftest-preflight-proxy:v3"}
+	for _, imageRef := range imageRefs {
+		setupLocalImage(t, imageRef)
+	}
 	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
-		Image:   imageRef,
+		Images:  imageRefs,
 		User:    user,
 		Host:    host,
 		KeyPath: keyPath,
@@ -71,11 +73,13 @@ func TestRun_PrintsAllFiveStages(t *testing.T) {
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
-	imageRef := "ship-wftest-run:latest"
-	setupLocalImage(t, imageRef)
+	imageRefs := []string{"ship-wftest-run:latest", "ship-wftest-run-proxy:v3"}
+	for _, imageRef := range imageRefs {
+		setupLocalImage(t, imageRef)
+	}
 	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
-		Image:   imageRef,
+		Images:  imageRefs,
 		User:    user,
 		Host:    host,
 		KeyPath: keyPath,
@@ -97,11 +101,13 @@ func TestRun_StagesInOrder(t *testing.T) {
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
-	imageRef := "ship-wftest-order:latest"
-	setupLocalImage(t, imageRef)
+	imageRefs := []string{"ship-wftest-order:latest", "ship-wftest-order-proxy:v3"}
+	for _, imageRef := range imageRefs {
+		setupLocalImage(t, imageRef)
+	}
 	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
-		Image:   imageRef,
+		Images:  imageRefs,
 		User:    user,
 		Host:    host,
 		KeyPath: keyPath,
@@ -135,11 +141,13 @@ func TestWorkflow_Summary(t *testing.T) {
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
-	imageRef := "ship-wftest-summary:latest"
-	setupLocalImage(t, imageRef)
+	imageRefs := []string{"ship-wftest-summary:latest", "ship-wftest-summary-proxy:v3"}
+	for _, imageRef := range imageRefs {
+		setupLocalImage(t, imageRef)
+	}
 	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
-		Image:   imageRef,
+		Images:  imageRefs,
 		User:    user,
 		Host:    host,
 		KeyPath: keyPath,
@@ -153,7 +161,7 @@ func TestWorkflow_Summary(t *testing.T) {
 
 	assert.Contains(t, out, "Ship complete")
 	assert.Contains(t, out, "Host:     "+host)
-	assert.Contains(t, out, "Image:    "+imageRef)
+	assert.Contains(t, out, "Images:   "+strings.Join(imageRefs, ", "))
 	assert.Contains(t, out, "Status:   Success")
 	assert.NotContains(t, out, "localhost:5001/")
 }
@@ -162,11 +170,13 @@ func TestWorkflow_TunnelCleanedUpOnSuccess(t *testing.T) {
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
-	imageRef := "ship-wftest-cleanup:latest"
-	setupLocalImage(t, imageRef)
+	imageRefs := []string{"ship-wftest-cleanup:latest", "ship-wftest-cleanup-proxy:v3"}
+	for _, imageRef := range imageRefs {
+		setupLocalImage(t, imageRef)
+	}
 	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
-		Image:   imageRef,
+		Images:  imageRefs,
 		User:    user,
 		Host:    host,
 		KeyPath: keyPath,

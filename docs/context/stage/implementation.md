@@ -2,11 +2,11 @@
 
 ## Stage Signatures
 
-- `Tag(original, transfer string) error`
+- `Tag(originals, transfers []string) error`
 - `Registry() error`
-- `Push(transfer string) error`
+- `Push(transfers []string) error`
 - `Tunnel(cfg cli.Config) (*ssh.TunnelProcess, error)`
-- `Pull(cfg cli.Config, original, transfer string) error`
+- `Pull(cfg cli.Config, originals, transfers []string) error`
 
 ## Common Pattern
 
@@ -21,8 +21,8 @@ Every stage follows the same structure:
 
 ### Tag
 
-- use `docker.TagImage(original, transfer)`
-- fail if the original image ref does not exist locally
+- use `docker.TagImage(original, transfer)` for each image
+- fail if any original image ref does not exist locally
 
 ### Registry
 
@@ -32,7 +32,7 @@ Every stage follows the same structure:
 
 ### Push
 
-- push exactly one transfer tag to the local registry
+- push each transfer tag to the local registry
 
 ### Tunnel
 
@@ -41,6 +41,6 @@ Every stage follows the same structure:
 
 ### Pull
 
-- run remote `docker pull` for the transfer tag
-- run remote `docker tag` to restore the original image ref
+- run remote `docker pull` for each transfer tag
+- run remote `docker tag` to restore each original image ref
 - do not execute arbitrary user-supplied shell commands

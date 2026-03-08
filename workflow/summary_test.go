@@ -22,12 +22,12 @@ func captureSummaryOutput(fn func()) string {
 
 func TestPrintSummary_Format(t *testing.T) {
 	cfg := cli.Config{
-		Host:  "h.example.com",
-		Image: "app:latest",
+		Host:   "h.example.com",
+		Images: []string{"app:latest", "traefik:v3"},
 	}
 	state := &State{
-		OriginalImage: "app:latest",
-		TransferImage: "localhost:5001/app:latest",
+		OriginalImages: []string{"app:latest", "traefik:v3"},
+		TransferImages: []string{"localhost:5001/app:latest", "localhost:5001/traefik:v3"},
 	}
 
 	out := captureSummaryOutput(func() {
@@ -36,17 +36,17 @@ func TestPrintSummary_Format(t *testing.T) {
 
 	assert.Contains(t, out, "Ship complete")
 	assert.Contains(t, out, "Host:     h.example.com")
-	assert.Contains(t, out, "Image:    app:latest")
+	assert.Contains(t, out, "Images:   app:latest, traefik:v3")
 	assert.Contains(t, out, "Status:   Success")
 }
 
 func TestPrintSummary_LabelAlignment(t *testing.T) {
 	cfg := cli.Config{
-		Host:  "host",
-		Image: "app:latest",
+		Host:   "host",
+		Images: []string{"app:latest"},
 	}
 	state := &State{
-		OriginalImage: "app:latest",
+		OriginalImages: []string{"app:latest"},
 	}
 
 	out := captureSummaryOutput(func() {
@@ -64,18 +64,18 @@ func TestPrintSummary_LabelAlignment(t *testing.T) {
 
 func TestPrintSummary_NoTransferTagsInOutput(t *testing.T) {
 	cfg := cli.Config{
-		Host:  "host",
-		Image: "app:latest",
+		Host:   "host",
+		Images: []string{"app:latest", "traefik:v3"},
 	}
 	state := &State{
-		OriginalImage: "app:latest",
-		TransferImage: "localhost:5001/app:latest",
+		OriginalImages: []string{"app:latest", "traefik:v3"},
+		TransferImages: []string{"localhost:5001/app:latest", "localhost:5001/traefik:v3"},
 	}
 
 	out := captureSummaryOutput(func() {
 		printSummary(cfg, state)
 	})
 
-	assert.Contains(t, out, "app:latest")
+	assert.Contains(t, out, "app:latest, traefik:v3")
 	assert.NotContains(t, out, "localhost:5001/")
 }

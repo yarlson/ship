@@ -40,8 +40,8 @@ func TestShip_Help_PrintsUsage(t *testing.T) {
 	require.NoError(t, err)
 
 	stdout := string(out)
-	assert.Contains(t, stdout, "ship — transfer a local Docker image to a remote host over SSH")
-	assert.Contains(t, stdout, "<user@host> <image[:tag]>")
+	assert.Contains(t, stdout, "ship — transfer local Docker images to a remote host over SSH")
+	assert.Contains(t, stdout, "<user@host> <image[:tag]> [<image[:tag]>...]")
 	assert.Contains(t, stdout, "-i, --identity-file")
 	assert.Contains(t, stdout, "-p, --port")
 }

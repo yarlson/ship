@@ -45,4 +45,4 @@ brews:
     commit_msg_template: "chore(formula): update ship to {{ .Tag }}"
     directory: Formula
     homepage: https://github.com/yarlson/ship
-    description: Transfer a local Docker image to a remote host over SSH.
+    description: Transfer local Docker images to a remote host over SSH.

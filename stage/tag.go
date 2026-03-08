@@ -8,11 +8,13 @@ import (
 )
 
 // Tag executes Stage 1: re-tag the local image with a localhost:5001/ prefix for transfer.
-func Tag(original, transfer string) error {
+func Tag(originals, transfers []string) error {
 	progress.StageStart(1, "Tagging image for transfer")
 
-	if err := docker.TagImage(original, transfer); err != nil {
-		return fmt.Errorf("failed to tag %s — %w", original, err)
+	for i, original := range originals {
+		if err := docker.TagImage(original, transfers[i]); err != nil {
+			return fmt.Errorf("failed to tag %s — %w", original, err)
+		}
 	}
 
 	progress.StageComplete(1, "Tag complete")
