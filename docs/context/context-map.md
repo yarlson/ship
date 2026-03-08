@@ -22,7 +22,11 @@
 
 ### Stage Domain
 
-- `stage/implementation.md` — Stage 1-4 implementations and data flow patterns
+- `stage/implementation.md` — Stage 1-7 implementations, data flow, and integration patterns
+
+### SSH Domain
+
+- `ssh/tunnel-management.md` — SSH tunnel lifecycle, remote command execution, process management
 
 ### Progress Domain
 

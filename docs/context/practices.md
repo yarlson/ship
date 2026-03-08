@@ -35,8 +35,16 @@
 - **Stage functions:** Named `stage.Build(cfg)`, `stage.Tag(imageMap)`, etc. Each takes required inputs and returns (result, error).
 - **Progress calls:** Each stage opens with `progress.StageStart(n, msg)` and closes with `progress.StageComplete(n, msg)`. Between them are the real operations.
 - **Error flow:** Stages return errors which bubble up to `workflow.Run()`. Errors contain context (what operation, why it failed).
-- **Data passing:** ImageMap pattern used to pass image metadata between stages (Stage 1 → Stage 2 → Stages 3-7 stubs).
+- **Data passing:** ImageMap pattern used to pass image metadata between stages (Stage 1 → 2 → 4, 6). TunnelProcess passed through workflow state (Stage 5 → cleanup).
 - **Docker operations:** `docker.ComposeBuild()`, `docker.ComposeConfig()`, `docker.TagImage()` handle CLI invocation and error wrapping.
+
+## SSH Tunnel Lifecycle
+
+- **TunnelProcess ownership:** `workflow.State` holds the single TunnelProcess. Stage 5 returns it; cleanup defers `ssh.StopTunnel()`.
+- **Safe process management:** TunnelProcess has a `done` channel closed by single goroutine when `cmd.Wait()` returns. Prevents data races.
+- **Graceful shutdown:** `ssh.StopTunnel()` sends SIGTERM, waits 5s, then SIGKILL if needed. Returns nil if already exited.
+- **No SDK dependency:** SSH operations use `exec.CommandContext("ssh", ...)` — not Go SSH library. Direct CLI invocation.
+- **Output suppression:** Tunnel stdin/stdout/stderr not captured (allows output to pass through if needed for debugging).
 
 ## Secrets & Output
 

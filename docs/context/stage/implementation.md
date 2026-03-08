@@ -161,40 +161,146 @@ Three failure points:
 - **Side effect:** Images pushed to local registry on :5001
 - **Data passing:** None to next stage
 
+## Stage 5: Tunnel
+
+**Function:** `Tunnel(cfg cli.Config) (*ssh.TunnelProcess, error)`
+
+### Flow
+
+1. Print `[5/7] Establishing tunnel to <host>...` via `progress.StageStart()`
+2. Call `ssh.StartTunnel(keyPath, user, host)` — starts background SSH process
+3. Reverse tunnel command: `ssh -R 5001:localhost:5001 user@host -N`
+4. Wait up to 2 seconds for tunnel to establish (select on `tp.Exited()`)
+5. If process exits during wait, tunnel failed
+6. Print `[5/7] Tunnel established` via `progress.StageComplete()`
+7. Return (TunnelProcess, nil) on success
+
+### Error Handling
+
+**Single failure point:**
+
+- **Tunnel fails:** `SSH tunnel failed — connection refused (verify --host and --key)`
+  - Cause: SSH connection refused, bad key, unreachable host
+  - Error guides user to check host and key path
+  - Process exits during 2-second wait window
+
+### Contract
+
+- **Input:** CLI config with SSH credentials (key, user, host)
+- **Output:** TunnelProcess handle for cleanup, or error
+- **Side effect:** Reverse SSH tunnel established and running in background
+- **Data passing:** TunnelProcess stored in workflow.State for deferred cleanup
+
+## Stage 6: Pull
+
+**Function:** `Pull(cfg cli.Config, imageMap map[string]string) error`
+
+### Flow
+
+1. Print `[6/7] Pulling and restoring images on remote host` via `progress.StageStart()`
+2. Receive ImageMap from Stage 1 (original → transfer tag)
+3. Iterate through ImageMap:
+   - For each image, execute `docker pull <transfer-tag>` on remote via SSH
+   - Execute `docker tag <transfer-tag> <original>` to restore original name
+4. Count successful image restores
+5. On first error, return immediately (fail fast)
+6. Print `[6/7] Pull and restore complete (N images)` via `progress.StageComplete()`
+7. Return nil on success
+
+### Error Handling
+
+**Two failure points:**
+
+1. **Pull fails:** `Failed to pull images on remote host — verify Docker is running on <host>`
+   - Cause: docker pull command failed (registry unreachable, image not found, etc.)
+   - Error names likely cause
+   - Workflow stops immediately
+
+2. **Tag fails:** `Failed to restore image tag on remote host — <original>`
+   - Cause: docker tag command failed on remote
+   - Error names which image failed
+   - Workflow stops immediately
+
+### Contract
+
+- **Input:** CLI config (SSH credentials), ImageMap from Stage 1
+- **Output:** nil on success, error on first failure
+- **Side effect:** Images pulled on remote and re-tagged to original names
+- **Data passing:** None to next stage
+
+## Stage 7: Command
+
+**Function:** `Command(cfg cli.Config) error`
+
+### Flow
+
+1. Print `[7/7] Running remote command` via `progress.StageStart()`
+2. Execute user-provided command from cfg.Command on remote via SSH
+3. Capture stdout and stderr from remote command
+4. Pass through stdout to progress.Writer (unformatted, direct passthrough)
+5. Pass through stderr to os.Stderr (direct passthrough)
+6. Check exit code
+7. Print `[7/7] Command complete` via `progress.StageComplete()`
+8. Return error if exit code is non-zero
+
+### Error Handling
+
+**Single failure point:**
+
+- **Command fails:** `Remote command exited with code <N> — see output above`
+  - Cause: remote command returned non-zero exit code
+  - Error names the exit code
+  - Command output is already printed above
+  - Workflow stops immediately
+
+### Contract
+
+- **Input:** CLI config (SSH credentials, command)
+- **Output:** nil on success (exit 0), error on failure (non-zero exit)
+- **Side effect:** Deployment command executes on remote, output visible to user
+- **Data passing:** None (final stage)
+
+### Output Rules
+
+- **Passthrough, not reformatted** — Command output printed as-is, maintaining formatting
+- **No suppression** — User sees all output from deployment command
+- **Interleaved streams** — stdout to progress.Writer, stderr to os.Stderr
+
 ## Integration with Workflow
 
 **File:** `workflow/workflow.go`
 
 ```go
 func Run(cfg cli.Config) error {
-    // Stage 1: Build
+    state := &State{}
+
+    // Stage 1-4: Build, Tag, Registry, Push
     imageMap, err := stage.Build(cfg.ComposeFiles)
     if err != nil {
         return err
     }
+    state.ImageMap = imageMap
+    // ... tag, registry, push ...
 
-    // Stage 2: Tag
-    if err := stage.Tag(imageMap); err != nil {
+    // Stage 5: Tunnel
+    tp, err := stage.Tunnel(cfg)
+    if err != nil {
+        return err
+    }
+    state.TunnelCmd = tp
+    defer cleanupTunnel(state)  // Ensure tunnel is stopped
+
+    // Stage 6: Pull
+    if err := stage.Pull(cfg, imageMap); err != nil {
         return err
     }
 
-    // Stage 3: Registry
-    if err := stage.Registry(); err != nil {
+    // Stage 7: Command
+    if err := stage.Command(cfg); err != nil {
         return err
     }
 
-    // Stage 4: Push
-    if err := stage.Push(imageMap); err != nil {
-        return err
-    }
-
-    // Stages 5-7: Stubs
-    for i, s := range stubs {
-        n := i + 5
-        progress.StageStart(n, s.startMsg)
-        progress.StageComplete(n, s.completeMsg)
-    }
-
+    printSummary(cfg, state)
     return nil
 }
 ```
@@ -202,19 +308,23 @@ func Run(cfg cli.Config) error {
 **Flow:**
 
 1. Stage 1 builds and returns ImageMap
-2. Stage 2 receives ImageMap, tags all images
+2. Stage 2 tags all images locally
 3. Stage 3 ensures registry is running on :5001
-4. Stage 4 pushes all transfer-tagged images to registry
-5. Stages 5-7 execute with stub implementations
-6. On any error, return immediately (fail fast)
+4. Stage 4 pushes all images to registry
+5. Stage 5 establishes tunnel, stores TunnelProcess in state
+6. Stage 6 pulls and restores images on remote
+7. Stage 7 executes deployment command on remote
+8. Deferred cleanup stops tunnel (SIGTERM → wait 5s → SIGKILL)
+9. On any error, cleanup still runs and returns error
+10. On success, print summary with images and host
 
 ## Testing
 
-Stages 1-4 have integration tests in `*_integration_test.go` files:
+All stages have integration tests in `*_integration_test.go` files:
 
-- **TestRun_PrintsAllSevenStages** — Verifies all 7 stages produce `[N/7]` output
-- **TestRun_StagesInOrder** — Verifies stage numbers appear in order
-- **TestRegistry_ChecksAndStartsRegistry** — Verifies registry startup and port conflict detection
-- **TestPush_PushesAllImages** — Verifies all transfer-tagged images are pushed
+- **stage/tunnel_integration_test.go** — Verifies tunnel establishment and bad-host error handling
+- **stage/pull_integration_test.go** — Verifies image pull and tag restoration on remote
+- **stage/command_integration_test.go** — Verifies command execution and output passthrough
+- **ship_integration_test.go** — Full end-to-end workflow tests
 
-Tests use real Docker Compose projects and Docker CLI operations.
+Tests use real Docker, SSH, and remote host for comprehensive validation.

@@ -23,3 +23,13 @@
 **Progress reporting** — Stage progress printed in `[N/7] message` format to help users track deployment progress.
 
 **Fail fast** — Exit immediately on first error with a clear message identifying what failed and what to check.
+
+**Reverse SSH tunnel** — SSH connection with port forwarding (`-R` flag) that makes remote host's forwarded port accessible via local port. Example: `ssh -R 5001:localhost:5001 user@host` allows remote to access localhost:5001 by connecting to its own port 5001.
+
+**TunnelProcess** — Wrapper struct (`ssh.TunnelProcess`) containing the SSH tunnel background process (`*exec.Cmd`), a `done` channel (closed when process exits), and methods for lifecycle management.
+
+**Remote command execution** — Running a command on a remote host via SSH without interaction. Uses `ssh -i key user@host command` with output captured to buffers.
+
+**Output passthrough** — Sending remote command output directly to stdout/stderr without reformatting or suppression. Used in Stage 7 to show deployment command output to the user.
+
+**Tunnel lifecycle** — The sequence: (1) start tunnel in Stage 5, (2) use in Stages 6-7, (3) cleanup via deferred `cleanupTunnel()` on workflow exit. Ensures tunnel is always stopped even on error.

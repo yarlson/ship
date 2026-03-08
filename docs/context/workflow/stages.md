@@ -76,35 +76,77 @@ The workflow runs these 7 stages in order, each with a start and completion mess
 
 ### Stage 5: Establish Tunnel
 
-**Message:** `[5/7] Establishing tunnel...` → `[5/7] Tunnel established`
+**Message:** `[5/7] Establishing tunnel to <host>...` → `[5/7] Tunnel established`
 
-Start reverse SSH tunnel (background process) from remote host to local registry. Allows remote host to access `localhost:5001`.
+**Implementation:** `stage.Tunnel(cfg)`
+
+1. Call `ssh.StartTunnel(keyPath, user, host)` to start reverse tunnel background process
+2. Reverse tunnel forwards remote port 5001 to local 5001 (`ssh -R 5001:localhost:5001`)
+3. Wait up to 2 seconds for tunnel to establish, checking if process exited early
+4. Return TunnelProcess handle for lifecycle management and cleanup
+5. Return error if tunnel fails to establish
+
+**Error cases:**
+
+- SSH tunnel connection fails (bad host, bad key, SSH server down)
+- Process exits during setup (connection refused)
+
+**Invariant:** Tunnel must stay alive for Stages 6-7. Workflow defers `cleanupTunnel()` to stop it on exit.
 
 ### Stage 6: Pull and Restore on Remote
 
-**Message:** `[6/7] Pulling and restoring images on remote host...` → `[6/7] Pull and restore complete`
+**Message:** `[6/7] Pulling and restoring images on remote host` → `[6/7] Pull and restore complete (N images)`
 
-Remote pulls images from tunnel-accessible registry and re-tags them back to original names.
+**Implementation:** `stage.Pull(cfg, imageMap)`
+
+1. Receive ImageMap from Stage 1 (original image ref → `localhost:5001/` transfer tag)
+2. Iterate through ImageMap entries
+3. For each image:
+   - Execute `docker pull <transfer-tag>` on remote via SSH
+   - Execute `docker tag <transfer-tag> <original>` on remote to restore original name
+4. Count successful image restores
+5. Return error on first failure (fail fast)
+
+**Error cases:**
+
+- Docker pull fails on remote (registry unreachable, image not found)
+- Docker tag fails on remote (permission denied, etc.)
+- SSH command execution fails
 
 ### Stage 7: Execute Remote Command
 
-**Message:** `[7/7] Running remote command...` → `[7/7] Command complete`
+**Message:** `[7/7] Running remote command` → `[7/7] Command complete`
 
-Execute user's deployment command on remote host (e.g., `docker compose up -d`).
+**Implementation:** `stage.Command(cfg)`
+
+1. Execute user-provided deployment command on remote via SSH (from cfg.Command)
+2. Capture command stdout and stderr
+3. Pass through stdout to progress.Writer (unformatted)
+4. Pass through stderr to os.Stderr
+5. Return error if exit code is non-zero
+6. User sees command output in real-time
+
+**Error cases:**
+
+- SSH command execution fails
+- Remote command exits with non-zero code
 
 ## Implementation
 
 **File:** `workflow/workflow.go`
 
-**Current state:** Stages 1-4 are real implementations. Stages 5-7 are stubs with hardcoded progress messages.
+**Current state:** All stages 1-7 have real implementations. Workflow manages ImageMap and TunnelProcess state across stages.
 
 **Data flow:**
 
-- `Run(cfg)` calls `stage.Build(cfg.ComposeFiles)` → returns ImageMap
-- `Run(cfg)` calls `stage.Tag(imageMap)` → tags all images
-- `Run(cfg)` calls `stage.Registry()` → starts registry if needed
-- `Run(cfg)` calls `stage.Push(imageMap)` → pushes images to registry
-- `Run(cfg)` iterates through stub stages 5-7, each prints start/completion
+- `Run(cfg)` calls `stage.Build(cfg.ComposeFiles)` → returns ImageMap, stored in State
+- `Run(cfg)` calls `stage.Tag(imageMap)` → tags all images locally
+- `Run(cfg)` calls `stage.Registry()` → starts local registry if needed
+- `Run(cfg)` calls `stage.Push(imageMap)` → pushes images to local registry
+- `Run(cfg)` calls `stage.Tunnel(cfg)` → starts reverse tunnel, returns TunnelProcess
+- `Run(cfg)` calls `stage.Pull(cfg, imageMap)` → pulls and restores images on remote via tunnel
+- `Run(cfg)` calls `stage.Command(cfg)` → executes deployment command on remote via tunnel
+- Deferred `cleanupTunnel()` stops TunnelProcess after all stages complete or on error
 - Each stage calls `progress.StageStart()` then does work, then `progress.StageComplete()`
 
 **Real implementation details:**
