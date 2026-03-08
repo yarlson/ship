@@ -43,13 +43,36 @@ The workflow runs these 7 stages in order, each with a start and completion mess
 
 **Message:** `[3/7] Starting local registry...` → `[3/7] Registry ready`
 
-Ensure local registry is running on `localhost:5001`. Start if not present.
+**Implementation:** `stage.Registry()`
+
+1. Check if a `registry:2` container is already running on port 5001 via `docker ps`
+2. If running, complete immediately
+3. If not running, check for port conflicts (existing containers or non-Docker processes on :5001)
+4. If port is free, start `registry:2` container with port mapping `5001:5000`
+5. Wait for registry to accept TCP connections on `:5001` (up to 3 seconds)
+
+**Error cases:**
+
+- Docker command fails (`docker ps`, `docker run`)
+- Port 5001 already in use (named what to check)
+- Registry started but fails to accept connections (timeout)
 
 ### Stage 4: Push to Local Registry
 
-**Message:** `[4/7] Pushing images to local registry...` → `[4/7] Push complete`
+**Message:** `[4/7] Pushing images to local registry...` → `[4/7] Push complete (N images)`
 
-Push tagged images to local registry on `:5001`.
+**Implementation:** `stage.Push(imageMap)`
+
+1. Receive ImageMap from earlier stages
+2. Iterate through transfer tags (values in ImageMap)
+3. For each transfer tag, run `docker push` to registry on `:5001`
+4. On first error, return immediately (fail fast)
+5. Return completion message with image count
+
+**Error cases:**
+
+- Docker push fails for any image (invalid reference, registry unreachable, etc.)
+- ImageMap is empty (would be caught earlier in workflow)
 
 ### Stage 5: Establish Tunnel
 
@@ -73,19 +96,21 @@ Execute user's deployment command on remote host (e.g., `docker compose up -d`).
 
 **File:** `workflow/workflow.go`
 
-**Current state:** Stages 1-2 are real implementations. Stages 3-7 are stubs with hardcoded progress messages.
+**Current state:** Stages 1-4 are real implementations. Stages 5-7 are stubs with hardcoded progress messages.
 
 **Data flow:**
 
 - `Run(cfg)` calls `stage.Build(cfg.ComposeFiles)` → returns ImageMap
 - `Run(cfg)` calls `stage.Tag(imageMap)` → tags all images
-- `Run(cfg)` iterates through stub stages 3-7, each prints start/completion
+- `Run(cfg)` calls `stage.Registry()` → starts registry if needed
+- `Run(cfg)` calls `stage.Push(imageMap)` → pushes images to registry
+- `Run(cfg)` iterates through stub stages 5-7, each prints start/completion
 - Each stage calls `progress.StageStart()` then does work, then `progress.StageComplete()`
 
 **Real implementation details:**
 
 - See `docs/context/docker/image-handling.md` for Docker CLI operations
-- See `docs/context/stage/implementation.md` for Stage 1-2 flow and error handling
+- See `docs/context/stage/implementation.md` for Stage 1-4 flow and error handling
 
 ## Error Handling
 

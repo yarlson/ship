@@ -14,7 +14,7 @@
 
 **Image tagging** — Re-tagging Docker images from their original names (e.g., `web:latest`) to local registry format (e.g., `localhost:5001/web:latest`) for local registry push.
 
-**ImageMap** — A map data structure built in Stage 1 that tracks the correspondence between original image references and their transfer tags. Key: original image ref; Value: `localhost:5001/` prefixed transfer tag. Passed from Stage 1 to Stage 2.
+**ImageMap** — A map data structure built in Stage 1 that tracks the correspondence between original image references and their transfer tags. Key: original image ref; Value: `localhost:5001/` prefixed transfer tag. Passed through stages 2, 4 to support tagging and pushing operations.
 
 **Transfer tag** — The `localhost:5001/` prefixed image tag used for local registry operations. Derived from the original image name and tag (e.g., `web:latest` → `localhost:5001/web:latest`).
 

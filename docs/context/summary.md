@@ -31,9 +31,9 @@ main → cli.Parse() → workflow.Run()
 - `cli/` — flag parsing and validation
 - `workflow/` — stage orchestration and pipeline sequencing
 - `progress/` — progress output formatting
-- `stage/` — stage implementations (Build, Tag)
-- `docker/` — Docker CLI utilities (compose build, config parsing, image tagging)
-- Future: `ssh/`, registry operations
+- `stage/` — stage implementations (Build, Tag, Registry, Push)
+- `docker/` — Docker CLI utilities (compose build, config parsing, image tagging, registry operations)
+- Future: `ssh/` for tunnel and remote operations
 
 **Data flow:** CLI flags → Config → WorkflowState (shared across stages) → result
 
@@ -51,19 +51,23 @@ main → cli.Parse() → workflow.Run()
 
 - Stage 1 (Build) — Real: runs `docker compose build`, discovers built images via `docker compose config`
 - Stage 2 (Tag) — Real: re-tags images with `localhost:5001/` prefix using ImageMap pattern
-- Stages 3-7 — Stub implementations with hardcoded progress messages
+- Stage 3 (Registry) — Real: checks registry status, detects port conflicts, starts registry:2 container on :5001
+- Stage 4 (Push) — Real: pushes transfer-tagged images to local registry on :5001
+- Stages 5-7 — Stub implementations with hardcoded progress messages
 
 **Data flow across stages:**
 
 - Stage 1 returns ImageMap (original name → transfer tag mapping)
 - Stage 2 receives ImageMap and tags all images
-- Stages 3-7 stubs execute independently
+- Stage 3 checks/starts registry (independent operation)
+- Stage 4 receives ImageMap and pushes images
+- Stages 5-7 stubs execute independently (stubs don't use image data)
 
 **Module boundaries enforced:**
 
 - `cli` — only flag parsing, no I/O
-- `docker` — Docker CLI operations (build, config, tag)
-- `stage` — stage business logic (orchestration, image tracking)
+- `docker` — Docker CLI operations (compose build, config parsing, tag, registry check/start, push)
+- `stage` — stage implementations (Build, Tag, Registry, Push) with progress integration
 - `workflow` — pipeline sequencing, stage invocation
 - `progress` — output formatting, testable via Writer var
 
@@ -76,6 +80,8 @@ main → cli.Parse() → workflow.Run()
 ✓ Run 7-stage workflow in sequence
 ✓ Build Docker Compose images and discover built images (Stage 1)
 ✓ Tag images with local registry prefix (Stage 2)
+✓ Check registry status, detect port conflicts, start registry on :5001 (Stage 3)
+✓ Push transfer-tagged images to local registry (Stage 4)
 ✓ Testable stage functions with mocked output
 
 ## Tech Stack

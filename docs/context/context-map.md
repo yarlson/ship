@@ -22,7 +22,7 @@
 
 ### Stage Domain
 
-- `stage/implementation.md` — Stage 1-2 implementations and ImageMap pattern
+- `stage/implementation.md` — Stage 1-4 implementations and data flow patterns
 
 ### Progress Domain
 

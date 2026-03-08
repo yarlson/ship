@@ -1,10 +1,10 @@
-# Stage Implementations (1-2)
+# Stage Implementations (1-4)
 
 ## Overview
 
-Stages 1 and 2 have real implementations. Stages 3-7 are stubs that print hardcoded progress messages.
+Stages 1-4 have real implementations. Stages 5-7 are stubs that print hardcoded progress messages.
 
-**File:** `stage/build.go`, `stage/tag.go`
+**Files:** `stage/build.go`, `stage/tag.go`, `stage/registry.go`, `stage/push.go`
 
 ## Stage 1: Build
 
@@ -87,6 +87,80 @@ Three failure points:
 - **Invariant:** All keys (original image refs) exist locally
 - **Side effect:** New tags created for all images (or partial if error occurs)
 
+## Stage 3: Registry
+
+**Function:** `Registry() error`
+
+### Flow
+
+1. Print `[3/7] Starting local registry...` via `progress.StageStart()`
+2. Call `docker.CheckRegistryRunning()` — check if `registry:2` on :5001 exists
+3. If already running, skip to completion
+4. If not running, call `docker.CheckPortConflict()` — detect if :5001 is occupied
+5. If port conflict detected, return error with instructions
+6. Call `docker.StartRegistry()` — start `registry:2` container with port mapping
+7. Wait for registry to accept TCP connections (up to 3 seconds with polling)
+8. Print `[3/7] Registry ready` via `progress.StageComplete()`
+
+### Error Handling
+
+Three failure points:
+
+1. **Registry check fails:** `Failed to check registry status — <error>`
+   - Cause: docker ps command failed
+   - Error wrapped with context
+
+2. **Port conflict detected:** `Port 5001 already in use — stop the existing process or free the port`
+   - Cause: Another container or process occupies :5001
+   - Message names the problem and action
+
+3. **Registry fails to start:** `Failed to start registry — <error>` or `registry started but not accepting connections on port 5001`
+   - Cause: docker run failed or registry not ready after 3 seconds
+   - Error identifies the specific issue
+
+### Contract
+
+- **Input:** None (reads system state)
+- **Output:** nil on success, error on failure
+- **Side effect:** Docker registry running on :5001 (or already was)
+- **Data passing:** None to next stage (registry state is implicit)
+
+## Stage 4: Push
+
+**Function:** `Push(imageMap map[string]string) error`
+
+### Flow
+
+1. Print `[4/7] Pushing images to local registry...` via `progress.StageStart()`
+2. Iterate through ImageMap values (transfer tags only, keys ignored)
+3. For each transfer tag, call `docker.PushImage(transfer)` — runs `docker push`
+4. Count successful pushes
+5. On first error, return immediately (fail fast)
+6. Print `[4/7] Push complete (N images)` via `progress.StageComplete()`
+7. Return nil on success
+
+### Error Handling
+
+**Single failure point:**
+
+- **Push fails:** `Failed to push <image> — <error>`
+  - Cause: docker push command failed (registry unreachable, invalid ref, etc.)
+  - Error names which image failed and why
+  - Workflow stops immediately
+
+### Invariant
+
+- ImageMap must be non-empty (guaranteed by Stage 1)
+- All transfer tags must be valid Docker image references
+- Registry must be running (guaranteed by Stage 3)
+
+### Contract
+
+- **Input:** ImageMap from Stage 1 (original → transfer tag mapping)
+- **Output:** nil on success, error on first failure
+- **Side effect:** Images pushed to local registry on :5001
+- **Data passing:** None to next stage
+
 ## Integration with Workflow
 
 **File:** `workflow/workflow.go`
@@ -104,9 +178,19 @@ func Run(cfg cli.Config) error {
         return err
     }
 
-    // Stages 3-7: Stubs
+    // Stage 3: Registry
+    if err := stage.Registry(); err != nil {
+        return err
+    }
+
+    // Stage 4: Push
+    if err := stage.Push(imageMap); err != nil {
+        return err
+    }
+
+    // Stages 5-7: Stubs
     for i, s := range stubs {
-        n := i + 3
+        n := i + 5
         progress.StageStart(n, s.startMsg)
         progress.StageComplete(n, s.completeMsg)
     }
@@ -119,14 +203,18 @@ func Run(cfg cli.Config) error {
 
 1. Stage 1 builds and returns ImageMap
 2. Stage 2 receives ImageMap, tags all images
-3. Stages 3-7 execute with stub implementations
-4. On any error, return immediately (fail fast)
+3. Stage 3 ensures registry is running on :5001
+4. Stage 4 pushes all transfer-tagged images to registry
+5. Stages 5-7 execute with stub implementations
+6. On any error, return immediately (fail fast)
 
 ## Testing
 
-Both stages have integration tests in `*_integration_test.go` files:
+Stages 1-4 have integration tests in `*_integration_test.go` files:
 
 - **TestRun_PrintsAllSevenStages** — Verifies all 7 stages produce `[N/7]` output
 - **TestRun_StagesInOrder** — Verifies stage numbers appear in order
+- **TestRegistry_ChecksAndStartsRegistry** — Verifies registry startup and port conflict detection
+- **TestPush_PushesAllImages** — Verifies all transfer-tagged images are pushed
 
-Tests use real Docker Compose project with temporary files.
+Tests use real Docker Compose projects and Docker CLI operations.

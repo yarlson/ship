@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `docker/` package provides CLI wrappers around Docker operations required by stages 1-2. All functions shell out to the `docker` CLI, no Go SDKs.
+The `docker/` package provides CLI wrappers around Docker operations required by stages 1-4. All functions shell out to the `docker` CLI, no Go SDKs.
 
 ## Image Struct
 
@@ -109,3 +109,61 @@ The `docker compose config --format json` output is parsed to extract services:
 5. Parse image name into Image struct
 
 **Result:** List of Image structs for all services that were built.
+
+## Registry Operations (Stages 3-4)
+
+All registry operations shell out to `docker` CLI or use raw TCP dialing for connection checks.
+
+### CheckRegistryRunning() (bool, error)
+
+Executes: `docker ps --filter ancestor=registry:2 --filter publish=5001 --format {{.ID}}`
+
+- Checks if a `registry:2` container is running with port 5001 published
+- Uses container filtering to find exact match
+- Returns true if exactly one container found, false if none
+
+**Error handling:** Returns `docker ps: <err>` if command fails.
+
+### CheckPortConflict() (bool, error)
+
+Performs two-stage port conflict detection:
+
+**Stage 1 (Docker containers):**
+- Executes: `docker ps --filter publish=5001 --format {{.ID}}`
+- Returns true immediately if any container uses :5001
+- Error handling: Returns `docker ps: <err>` if command fails
+
+**Stage 2 (Non-Docker processes):**
+- Attempts TCP dial to `localhost:5001` with 1-second timeout
+- Returns true if connection succeeds (port occupied)
+- Returns false if connection refused (port free) — treated as success, not error
+- Used to detect processes running outside Docker
+
+### StartRegistry() error
+
+Executes: `docker run -d -p 5001:5000 registry:2`
+
+**Process:**
+
+1. Runs `registry:2` container in detached mode, maps host :5001 to container :5000
+2. Waits for registry to accept TCP connections (up to 3 seconds)
+3. Uses TCP dial with 500ms timeout, polls up to 30 times (3 second total wait)
+4. Returns immediately on first successful connection
+
+**Error handling:**
+
+- Command execution: Returns `docker run registry: <output>`
+- Timeout: Returns `registry started but not accepting connections on port 5001`
+- Output includes docker run stderr if startup fails
+
+### PushImage(imageRef string) error
+
+Executes: `docker push imageRef`
+
+- Pushes the specified image reference to registry (must be resolvable)
+- Uses combined stdout/stderr for error reporting
+- Called once per transfer-tagged image
+
+**Error handling:** Returns `docker push: <output>` with full docker output on failure.
+
+**Invariant:** ImageRef must be a valid transfer tag (e.g., `localhost:5001/web:latest`).
