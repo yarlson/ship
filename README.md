@@ -1,214 +1,169 @@
 # ship
 
-Build, transfer, and deploy Docker Compose images to a remote host in a single command.
+`ship` deploys Docker Compose images to a remote host without building on that host.
 
-`ship` builds your Docker Compose images locally, transfers them to a remote host via SSH tunnel and a local registry, and executes a deployment command—all in one invocation.
+It builds your images locally, pushes them through a temporary local registry exposed over an SSH reverse tunnel, restores the original image tags on the remote machine, and then runs your deploy command.
 
-- **Local build** — Builds images defined in your Docker Compose file(s)
-- **Image transfer** — Pushes images through a local registry (port 5001) via SSH reverse tunnel
-- **Remote deployment** — Executes your deployment command on the remote host
+This is useful when:
 
-## Prerequisites
+- builds should happen on the machine that already has source code and build cache
+- the remote host should only pull images and run `docker compose`
+- the remote host already has the Compose project checked out, but not the freshly built images
 
-- Go 1.25.0 or later
-- Docker (with Docker Compose V2)
-- SSH access to the remote host with a private key
+## What `ship` actually does
 
-Before running the pipeline, `ship` validates all prerequisites:
+`ship` does not copy source code or Compose files to the remote host.
 
-- Docker is installed and accessible
-- Docker Compose V2 plugin is available
-- SSH is installed
-- SSH key file exists and is readable
-- Compose file(s) exist and are readable
-- SSH connectivity to the remote host works
+It does this in one run:
 
-If any check fails, `ship` exits immediately with a clear error message before any stages run.
+1. builds images from your local Compose file set
+2. tags them as `localhost:5001/...`
+3. starts a local Docker registry on port `5001`
+4. pushes the images into that registry
+5. opens an SSH reverse tunnel so the remote host can reach that registry
+6. pulls the images on the remote host and restores their original tags
+7. runs your remote deploy command
+
+## What must already exist
+
+On the local machine:
+
+- Go `1.25.0+` if building from source
+- Docker with Compose V2
+- `ssh`
+- the Compose file(s) you want to build from
+- an SSH private key that can reach the remote host
+
+On the remote host:
+
+- `ssh` access for the target user
+- Docker installed and running
+- the Compose project already present if your command expects it
+- a free port `5001` on the remote side for the reverse tunnel
 
 ## Install
 
-```bash
-go install ship@latest
-```
-
-Or build from source:
+Build from source:
 
 ```bash
 go build -o ship .
 ```
 
-## Quickstart
+Show help:
 
 ```bash
-ship \
-  --docker-compose docker-compose.yml \
-  --user deploy \
-  --host 10.0.0.5 \
-  --key ~/.ssh/id_ed25519 \
-  --command "docker compose up -d"
+./ship --help
 ```
 
 ## Usage
 
+```bash
+ship \
+  --docker-compose <compose.yml[,override.yml]> \
+  --user <ssh-user> \
+  --host <host> \
+  --key <private-key-path> \
+  --command "<remote-command>"
 ```
-ship [flags]
-```
 
-### Required Flags
+Required flags:
 
-| Flag                      | Description                                           |
-| ------------------------- | ----------------------------------------------------- |
-| `--docker-compose <path>` | Path to compose file(s), comma-separated for multiple |
-| `--user <user>`           | SSH user on the remote host                           |
-| `--host <host>`           | Remote host address                                   |
-| `--key <path>`            | Path to SSH private key file                          |
-| `--command <cmd>`         | Command to execute on the remote host after transfer  |
+| Flag               | Meaning                                                     |
+| ------------------ | ----------------------------------------------------------- |
+| `--docker-compose` | One or more local Compose files, comma-separated            |
+| `--user`           | SSH user on the remote host                                 |
+| `--host`           | Remote host                                                 |
+| `--key`            | Path to the SSH private key                                 |
+| `--command`        | Command to run on the remote host after images are restored |
 
-### Examples
+## Example
 
-Single compose file:
+Local machine:
+
+- has `compose.yml` and `compose.prod.yml`
+- builds the images
+
+Remote host:
+
+- already has the same Compose project checked out
+- should restart services with the newly shipped images
 
 ```bash
-ship --docker-compose docker-compose.yml --user deploy --host 10.0.0.5 --key ~/.ssh/id_ed25519 --command "docker compose up -d"
+./ship \
+  --docker-compose compose.yml,compose.prod.yml \
+  --user deploy \
+  --host staging.example.com \
+  --key ~/.ssh/id_ed25519 \
+  --command "cd /srv/app && docker compose -f compose.yml -f compose.prod.yml up -d"
 ```
 
-Multiple compose files:
+If the remote host needs to pull external images referenced by the Compose file, do that in the command you pass:
 
 ```bash
-ship --docker-compose compose.yml,compose.prod.yml --user root --host staging.example.com --key ./key.pem --command "docker compose pull && docker compose up -d"
+./ship \
+  --docker-compose compose.yml,compose.prod.yml \
+  --user deploy \
+  --host staging.example.com \
+  --key ~/.ssh/id_ed25519 \
+  --command "cd /srv/app && docker compose -f compose.yml -f compose.prod.yml pull && docker compose -f compose.yml -f compose.prod.yml up -d"
 ```
 
-## Configuration
+## What `ship` checks before it starts
 
-| Variable | Required | Description                                |
-| -------- | -------- | ------------------------------------------ |
-| `HOME`   | Yes      | Used for SSH key path expansion (implicit) |
+Before running any stage, `ship` fails fast if any of these are missing or broken:
 
-## Workflow Stages
+- Docker
+- Docker Compose V2
+- `ssh`
+- the SSH key file
+- every Compose file passed to `--docker-compose`
+- SSH connectivity to `--user@--host`
 
-`ship` executes a 7-stage workflow:
+If preflight passes, stage progress is printed in a consistent `[N/7]` format and the final remote command output is passed through directly.
 
-| Stage | Description                                  | Status      |
-| ----- | -------------------------------------------- | ----------- |
-| 1     | Build Docker Compose images                  | Implemented |
-| 2     | Re-tag images with `localhost:5001/` prefix  | Implemented |
-| 3     | Ensure local registry container on port 5001 | Implemented |
-| 4     | Push images to local registry                | Implemented |
-| 5     | Establish SSH reverse tunnel                 | Implemented |
-| 6     | Pull and restore images on remote host       | Implemented |
-| 7     | Execute remote command via SSH               | Implemented |
+## Constraints
 
-## Troubleshooting
-
-### Docker or Docker Compose not found
-
-**Symptom**: `Error: Docker is not installed or not in PATH` or `Error: docker compose (V2) is required`
-
-**Fix**:
-
-- Install [Docker Desktop](https://www.docker.com/products/docker-desktop) or Docker Engine
-- Ensure Docker Compose V2 is installed: `docker compose version`
-- If using Docker Engine, install the [Compose plugin](https://docs.docker.com/compose/install/linux/#install-using-the-repository)
-
-### SSH key file not found or unreadable
-
-**Symptom**: `Error: SSH key file not found: /path/to/key — verify the --key path`
-
-**Fix**:
-
-- Verify the `--key` path is correct
-- Use `~` for home directory expansion (e.g., `~/.ssh/id_ed25519`)
-- Check file permissions: `ls -la ~/.ssh/id_ed25519`
-
-### SSH connection failed
-
-**Symptom**: `Error: SSH connection failed — verify --host and --key`
-
-**Fix**:
-
-- Verify the remote `--host` is reachable and correct
-- Verify the `--key` matches a private key on your system
-- Check SSH access: `ssh -i ~/.ssh/id_ed25519 user@host echo ok`
-- Ensure the remote user (via `--user`) has SSH access configured
-
-### Compose file not found or unreadable
-
-**Symptom**: `Error: Compose file not found: /path/to/compose.yml` or `Error: Cannot read compose file: /path/to/compose.yml — check file permissions`
-
-**Fix**:
-
-- Verify the `--docker-compose` path(s) are correct and exist
-- For relative paths, ensure they're relative to your current working directory
-- Check file permissions: `ls -la compose.yml`
-- Use absolute paths if relative paths cause issues
-- For multiple files, ensure all files in the comma-separated list exist
-
-### Port 5001 is required
-
-**Symptom**: Cannot use a custom registry port.
-
-**Cause**: Port 5001 is hardcoded in the implementation.
-
-**Workaround**: Ensure port 5001 is available or modify the source code.
+- `ship` only transfers images built from services that have a Compose `build` key.
+- The local registry port is fixed at `5001`.
+- The transfer path depends on SSH reverse port forwarding to the remote host.
+- `ship` restores original image tags on the remote host, then runs exactly the command you provide.
 
 ## Development
 
-### Build
+Build:
 
 ```bash
 go build -o ship .
 ```
 
-### Test
-
-Run unit tests:
-
-```bash
-go test -race -count=1 -v -timeout=120s ./...
-```
-
-Run integration tests (requires Docker):
-
-```bash
-go test -race -count=1 -v -timeout=120s -tags=integration ./...
-```
-
-### Lint
+Lint:
 
 ```bash
 golangci-lint run --fix ./...
 ```
 
-### Format
+Test:
+
+```bash
+go test -race -count=1 -v -timeout=120s ./...
+```
+
+Integration tests:
+
+```bash
+go test -race -count=1 -v -timeout=120s -tags=integration ./...
+```
+
+Format docs:
 
 ```bash
 bunx prettier --write "**/*.md"
 ```
 
-## Project Structure
+## Docs
 
-```
-ship/
-├── main.go          # Entry point — parse flags, invoke workflow
-├── cli/             # Flag parsing and validation
-├── workflow/        # 7-stage orchestrator
-├── stage/           # Individual workflow stages
-├── docker/          # Docker CLI wrappers
-├── progress/        # Stage progress printer
-└── testlock/        # Test synchronization utilities
-```
-
-## Documentation
-
-- [Architecture](docs/ARCHITECTURE.md) — Module map, boundaries, data flow, design decisions
-- [Testing](docs/TESTING.md) — TDD workflow, test tiers, Testify usage
-- [Go Conventions](docs/GO.md) — Style, error handling, import order
-- [Output Rules](docs/OUTPUT.md) — User-facing messages, progress format, error format
-
-## Contributing
-
-Not documented. Check the repository for contribution guidelines.
-
-## License
-
-Not specified.
+- [Architecture](docs/ARCHITECTURE.md)
+- [Testing](docs/TESTING.md)
+- [Go conventions](docs/GO.md)
+- [Output rules](docs/OUTPUT.md)
+- [Context docs](docs/context/)
