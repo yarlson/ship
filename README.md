@@ -82,7 +82,7 @@ Homebrew:
 
 ```bash
 brew tap yarlson/tap
-brew install --cask ship
+brew install ship
 ```
 
 Direct download from GitHub Releases:

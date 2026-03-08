@@ -30,11 +30,9 @@ archives:
 checksum:
   name_template: checksums.txt
 
-homebrew_casks:
+brews:
   - name: ship
     ids:
-      - ship
-    binaries:
       - ship
     repository:
       owner: yarlson
@@ -44,8 +42,7 @@ homebrew_casks:
     commit_author:
       name: github-actions[bot]
       email: 41898282+github-actions[bot]@users.noreply.github.com
-    commit_msg_template: "chore(cask): update ship to {{ .Tag }}"
-    directory: Casks
+    commit_msg_template: "chore(formula): update ship to {{ .Tag }}"
+    directory: Formula
     homepage: https://github.com/yarlson/ship
     description: Transfer a local Docker image to a remote host over SSH.
-    skip_upload: "{{ .IsSnapshot }}"
