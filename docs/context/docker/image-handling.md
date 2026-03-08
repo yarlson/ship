@@ -129,11 +129,13 @@ Executes: `docker ps --filter ancestor=registry:2 --filter publish=5001 --format
 Performs two-stage port conflict detection:
 
 **Stage 1 (Docker containers):**
+
 - Executes: `docker ps --filter publish=5001 --format {{.ID}}`
 - Returns true immediately if any container uses :5001
 - Error handling: Returns `docker ps: <err>` if command fails
 
 **Stage 2 (Non-Docker processes):**
+
 - Attempts TCP dial to `localhost:5001` with 1-second timeout
 - Returns true if connection succeeds (port occupied)
 - Returns false if connection refused (port free) — treated as success, not error
