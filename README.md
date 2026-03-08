@@ -1,6 +1,6 @@
 # ship
 
-Build here. Run there.
+Deploy Docker Compose images over SSH, without a registry.
 
 If the source code and Docker cache live on your machine, but deployment happens on a remote host, there is an annoying gap: the server needs fresh images, but building there is slow, fragile, or not allowed.
 
