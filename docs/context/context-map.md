@@ -14,6 +14,12 @@
 ### Workflow Domain
 - `workflow/stages.md` — 7-stage pipeline definition and flow
 
+### Docker Domain
+- `docker/image-handling.md` — Docker CLI operations and image metadata parsing
+
+### Stage Domain
+- `stage/implementation.md` — Stage 1-2 implementations and ImageMap pattern
+
 ### Progress Domain
 - `progress/output.md` — Progress reporting format and testability
 

@@ -27,9 +27,11 @@ main → cli.Parse() → workflow.Run()
 
 **Core modules:**
 - `cli/` — flag parsing and validation
-- `workflow/` — stage orchestration
+- `workflow/` — stage orchestration and pipeline sequencing
 - `progress/` — progress output formatting
-- Future: `stage/`, `docker/`, `ssh/` (stubs in workflow)
+- `stage/` — stage implementations (Build, Tag)
+- `docker/` — Docker CLI utilities (compose build, config parsing, image tagging)
+- Future: `ssh/`, registry operations
 
 **Data flow:** CLI flags → Config → WorkflowState (shared across stages) → result
 
@@ -43,15 +45,21 @@ main → cli.Parse() → workflow.Run()
 
 ## System State
 
-**Current implementation:** Stub stages with hardcoded stage pipeline.
-- Stages run in sequence with progress output
-- No actual Docker, SSH, or registry operations yet
-- All required flags parsed and validated
-- Error handling scaffolding in place
+**Implemented stages:**
+- Stage 1 (Build) — Real: runs `docker compose build`, discovers built images via `docker compose config`
+- Stage 2 (Tag) — Real: re-tags images with `localhost:5001/` prefix using ImageMap pattern
+- Stages 3-7 — Stub implementations with hardcoded progress messages
+
+**Data flow across stages:**
+- Stage 1 returns ImageMap (original name → transfer tag mapping)
+- Stage 2 receives ImageMap and tags all images
+- Stages 3-7 stubs execute independently
 
 **Module boundaries enforced:**
 - `cli` — only flag parsing, no I/O
-- `workflow` — stage sequencing, no external processes
+- `docker` — Docker CLI operations (build, config, tag)
+- `stage` — stage business logic (orchestration, image tracking)
+- `workflow` — pipeline sequencing, stage invocation
 - `progress` — output formatting, testable via Writer var
 
 ## Capabilities
@@ -61,6 +69,8 @@ main → cli.Parse() → workflow.Run()
 ✓ Fail fast with clear error messages naming what failed
 ✓ Print stage progress in `[N/7]` format
 ✓ Run 7-stage workflow in sequence
+✓ Build Docker Compose images and discover built images (Stage 1)
+✓ Tag images with local registry prefix (Stage 2)
 ✓ Testable stage functions with mocked output
 
 ## Tech Stack

@@ -26,7 +26,17 @@
 - **`cli`** — Only flag parsing. No I/O beyond parsing.
 - **`workflow`** — Stage orchestration. Calls stage functions. Owns sequence.
 - **`progress`** — Output formatting. Testable via `Writer` var.
+- **`docker`** — Docker CLI operations (build, config, tag). Wraps `docker` CLI. Returns errors, not exit codes.
+- **`stage`** — Stage implementations. Each stage function: calls docker/SSH utilities, calls progress functions, returns data for next stage or error.
 - **External processes** — Shell out to `docker` and `ssh` CLIs, not Go SDKs.
+
+## Stage Implementation Pattern
+
+- **Stage functions:** Named `stage.Build(cfg)`, `stage.Tag(imageMap)`, etc. Each takes required inputs and returns (result, error).
+- **Progress calls:** Each stage opens with `progress.StageStart(n, msg)` and closes with `progress.StageComplete(n, msg)`. Between them are the real operations.
+- **Error flow:** Stages return errors which bubble up to `workflow.Run()`. Errors contain context (what operation, why it failed).
+- **Data passing:** ImageMap pattern used to pass image metadata between stages (Stage 1 → Stage 2 → Stages 3-7 stubs).
+- **Docker operations:** `docker.ComposeBuild()`, `docker.ComposeConfig()`, `docker.TagImage()` handle CLI invocation and error wrapping.
 
 ## Secrets & Output
 

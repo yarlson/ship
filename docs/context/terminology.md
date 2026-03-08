@@ -14,6 +14,12 @@
 
 **Image tagging** — Re-tagging Docker images from their original names (e.g., `web:latest`) to local registry format (e.g., `localhost:5001/web:latest`) for local registry push.
 
+**ImageMap** — A map data structure built in Stage 1 that tracks the correspondence between original image references and their transfer tags. Key: original image ref; Value: `localhost:5001/` prefixed transfer tag. Passed from Stage 1 to Stage 2.
+
+**Transfer tag** — The `localhost:5001/` prefixed image tag used for local registry operations. Derived from the original image name and tag (e.g., `web:latest` → `localhost:5001/web:latest`).
+
+**Compose config** — Output from `docker compose config --format json`. Used in Stage 1 to discover which services have build keys and extract their image names.
+
 **Progress reporting** — Stage progress printed in `[N/7] message` format to help users track deployment progress.
 
 **Fail fast** — Exit immediately on first error with a clear message identifying what failed and what to check.
