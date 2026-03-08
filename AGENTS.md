@@ -15,6 +15,9 @@ go test -race -count=1 -v -timeout=120s ./...
 # Integration tests (require Docker)
 go test -race -count=1 -v -timeout=120s -tags=integration ./...
 
+# E2E tests (require Docker + SSH test host)
+go test -race -count=1 -v -timeout=120s -tags=e2e ./...
+
 # Format docs
 bunx prettier --write "**/*.md"
 ```

@@ -4,7 +4,9 @@ package stage
 
 import (
 	"bytes"
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -23,8 +25,17 @@ func captureOutput(fn func()) string {
 	return buf.String()
 }
 
+func requireDocker(t *testing.T) {
+	t.Helper()
+	cmd := exec.CommandContext(context.Background(), "docker", "version")
+	if err := cmd.Run(); err != nil {
+		t.Skipf("skipping integration test: Docker daemon unavailable: %v", err)
+	}
+}
+
 func setupComposeProject(t *testing.T) string {
 	t.Helper()
+	requireDocker(t)
 	dir := t.TempDir()
 
 	dockerfile := filepath.Join(dir, "Dockerfile")
@@ -70,6 +81,7 @@ func TestBuild_RealComposeFile(t *testing.T) {
 }
 
 func TestBuild_NoImages(t *testing.T) {
+	requireDocker(t)
 	dir := t.TempDir()
 	compose := filepath.Join(dir, "compose.yml")
 	content := `services:

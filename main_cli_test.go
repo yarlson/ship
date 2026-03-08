@@ -16,7 +16,7 @@ import (
 var binaryPath string
 
 func TestMain(m *testing.M) {
-	tmpDir, err := os.MkdirTemp("", "ship-e2e")
+	tmpDir, err := os.MkdirTemp("", "ship-cli")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create temp dir: %s\n", err)
 		os.Exit(1)

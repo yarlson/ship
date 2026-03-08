@@ -319,11 +319,13 @@ func Run(cfg cli.Config) error {
 
 ## Testing
 
-All stages have integration tests in `*_integration_test.go` files:
+Local Docker-backed stage coverage stays in `*_integration_test.go` files.
 
-- **stage/tunnel_integration_test.go** — Verifies tunnel establishment and bad-host error handling
-- **stage/pull_integration_test.go** — Verifies image pull and tag restoration on remote
-- **stage/command_integration_test.go** — Verifies command execution and output passthrough
-- **ship_integration_test.go** — Full end-to-end workflow tests
+Remote-host coverage lives in `*_e2e_test.go` files:
 
-Tests use real Docker, SSH, and remote host for comprehensive validation.
+- **stage/tunnel_e2e_test.go** — Verifies tunnel establishment and bad-host error handling
+- **stage/pull_e2e_test.go** — Verifies image pull and tag restoration on remote
+- **stage/command_e2e_test.go** — Verifies command execution and output passthrough
+- **main_e2e_test.go** — Full end-to-end CLI workflow tests
+
+These tests use real Docker, SSH, and the remote host.

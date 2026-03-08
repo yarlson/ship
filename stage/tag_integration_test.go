@@ -12,6 +12,7 @@ import (
 )
 
 func TestTag_CreatesTransferTags(t *testing.T) {
+	requireDocker(t)
 	composePath := setupComposeProject(t)
 
 	// First build images.
@@ -36,6 +37,7 @@ func TestTag_CreatesTransferTags(t *testing.T) {
 }
 
 func TestBuildAndTag_HappyPath_E2E(t *testing.T) {
+	requireDocker(t)
 	composePath := setupComposeProject(t)
 
 	// Stage 1: Build.

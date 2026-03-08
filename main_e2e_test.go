@@ -1,4 +1,4 @@
-//go:build integration
+//go:build e2e
 
 package main_test
 
@@ -17,8 +17,31 @@ import (
 	"ship/testlock"
 )
 
+func requireE2EPrereqs(t *testing.T) {
+	t.Helper()
+
+	dockerCmd := exec.CommandContext(context.Background(), "docker", "version")
+	if err := dockerCmd.Run(); err != nil {
+		t.Skipf("skipping e2e test: Docker daemon unavailable: %v", err)
+	}
+
+	keyPath := testSSHKeyPath(t)
+	sshCmd := exec.CommandContext(context.Background(), "ssh",
+		"-i", keyPath,
+		"-o", "ConnectTimeout=5",
+		"-o", "StrictHostKeyChecking=accept-new",
+		"-o", "BatchMode=yes",
+		"root@46.101.213.82",
+		"true",
+	)
+	if err := sshCmd.Run(); err != nil {
+		t.Skipf("skipping e2e test: SSH test host unavailable: %v", err)
+	}
+}
+
 func setupComposeProject(t *testing.T) string {
 	t.Helper()
+	requireE2EPrereqs(t)
 	dir := t.TempDir()
 
 	dockerfile := filepath.Join(dir, "Dockerfile")
@@ -52,7 +75,11 @@ func testSSHKeyPath(t *testing.T) string {
 	t.Helper()
 	home, err := os.UserHomeDir()
 	require.NoError(t, err)
-	return home + "/.ssh/id_rsa"
+	keyPath := home + "/.ssh/id_rsa"
+	if _, err := os.Stat(keyPath); err != nil {
+		t.Skipf("skipping e2e test: SSH key unavailable: %v", err)
+	}
+	return keyPath
 }
 
 func TestShip_AllFlags_PrintsSevenStages(t *testing.T) {
@@ -127,6 +154,7 @@ func TestShip_AllFlags_PrintsSevenStages(t *testing.T) {
 }
 
 func TestShip_NoBuildServices_FailsWithError(t *testing.T) {
+	requireE2EPrereqs(t)
 	dir := t.TempDir()
 	compose := filepath.Join(dir, "compose.yml")
 	content := `services:
@@ -224,6 +252,7 @@ func TestShip_MissingComposeFile_FailsBeforeStages(t *testing.T) {
 }
 
 func TestShip_EmptyCommand_FailsBeforeStages(t *testing.T) {
+	requireE2EPrereqs(t)
 	composePath := setupComposeProject(t)
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,
@@ -247,6 +276,7 @@ func TestShip_EmptyCommand_FailsBeforeStages(t *testing.T) {
 }
 
 func TestShip_MultiFileCompose_E2E(t *testing.T) {
+	requireE2EPrereqs(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
@@ -304,6 +334,7 @@ func TestShip_MultiFileCompose_E2E(t *testing.T) {
 }
 
 func TestShip_TransferTagsExist(t *testing.T) {
+	requireE2EPrereqs(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })

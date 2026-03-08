@@ -154,6 +154,12 @@ Integration tests:
 go test -race -count=1 -v -timeout=120s -tags=integration ./...
 ```
 
+E2E tests against the remote host:
+
+```bash
+go test -race -count=1 -v -timeout=120s -tags=e2e ./...
+```
+
 Format docs:
 
 ```bash

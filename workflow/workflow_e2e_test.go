@@ -1,4 +1,4 @@
-//go:build integration
+//go:build e2e
 
 package workflow
 
@@ -29,11 +29,40 @@ func captureOutput(fn func()) string {
 	return buf.String()
 }
 
+func requireE2EPrereqs(t *testing.T, keyPath, user, host string) {
+	t.Helper()
+
+	dockerCmd := exec.CommandContext(context.Background(), "docker", "version")
+	if err := dockerCmd.Run(); err != nil {
+		t.Skipf("skipping e2e test: Docker daemon unavailable: %v", err)
+	}
+
+	if _, err := os.Stat(keyPath); err != nil {
+		t.Skipf("skipping e2e test: SSH key unavailable: %v", err)
+	}
+
+	sshCmd := exec.CommandContext(context.Background(), "ssh",
+		"-i", keyPath,
+		"-o", "ConnectTimeout=5",
+		"-o", "StrictHostKeyChecking=accept-new",
+		"-o", "BatchMode=yes",
+		user+"@"+host,
+		"true",
+	)
+	if err := sshCmd.Run(); err != nil {
+		t.Skipf("skipping e2e test: SSH test host unavailable: %v", err)
+	}
+}
+
 func testSSHConfig(t *testing.T) (keyPath, user, host string) {
 	t.Helper()
 	home, err := os.UserHomeDir()
 	require.NoError(t, err)
-	return home + "/.ssh/id_rsa", "root", "46.101.213.82"
+	keyPath = home + "/.ssh/id_rsa"
+	user = "root"
+	host = "46.101.213.82"
+	requireE2EPrereqs(t, keyPath, user, host)
+	return keyPath, user, host
 }
 
 func setupComposeProject(t *testing.T) string {
@@ -65,6 +94,21 @@ func setupComposeProject(t *testing.T) string {
 	require.NoError(t, os.WriteFile(compose, []byte(content), 0o600))
 
 	return compose
+}
+
+func TestPreflight_PassesWithValidConfig(t *testing.T) {
+	composePath := setupComposeProject(t)
+	keyPath, user, host := testSSHConfig(t)
+	cfg := cli.Config{
+		ComposeFiles: []string{composePath},
+		User:         user,
+		Host:         host,
+		KeyPath:      keyPath,
+		Command:      "echo test",
+	}
+
+	err := Preflight(cfg)
+	assert.NoError(t, err)
 }
 
 func TestRun_PrintsAllSevenStages(t *testing.T) {

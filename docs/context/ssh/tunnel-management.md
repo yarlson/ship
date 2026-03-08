@@ -165,4 +165,4 @@ Rationale: Ship runs as CLI tool in user's environment. User provides host, key,
 ## Testing
 
 - **ssh_test.go** — Unit tests for SSH arg building
-- **ssh_integration_test.go** — Integration tests against real SSH connections and test server
+- **ssh_e2e_test.go** — E2E tests against real SSH connections and the test server

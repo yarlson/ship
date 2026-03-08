@@ -33,6 +33,7 @@ func queryRegistryTags(t *testing.T, name string) []string {
 }
 
 func TestRegistryAndPush_HappyPath_E2E(t *testing.T) {
+	requireDocker(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
@@ -78,6 +79,7 @@ func TestRegistryAndPush_HappyPath_E2E(t *testing.T) {
 }
 
 func TestPush_PushesImagesToRegistry(t *testing.T) {
+	requireDocker(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
@@ -114,6 +116,7 @@ func TestPush_PushesImagesToRegistry(t *testing.T) {
 }
 
 func TestPush_ReportsImageCount(t *testing.T) {
+	requireDocker(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
@@ -153,6 +156,7 @@ func TestPush_EmptyImageMap(t *testing.T) {
 }
 
 func TestPush_FailsOnBadImageRef(t *testing.T) {
+	requireDocker(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })

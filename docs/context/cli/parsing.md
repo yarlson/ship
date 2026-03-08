@@ -40,6 +40,7 @@ Help text is a constant with usage and examples. Displayed on `--help` flag.
 **Example invocations:**
 
 Single compose file:
+
 ```bash
 ship --docker-compose docker-compose.yml \
      --user deploy \
@@ -49,6 +50,7 @@ ship --docker-compose docker-compose.yml \
 ```
 
 Multiple compose files (comma-separated):
+
 ```bash
 ship --docker-compose compose.yml,compose.prod.yml \
      --user root \

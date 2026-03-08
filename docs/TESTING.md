@@ -15,8 +15,8 @@ Start from the outermost layer (CLI, workflow) and work inward (stages, docker/s
 | Tier        | Scope                                       | Tag           | Docker required |
 | ----------- | ------------------------------------------- | ------------- | --------------- |
 | Unit        | Pure logic: parsing, formatting, validation | (none)        | No              |
-| Integration | Real Docker, real filesystem, localhost SSH | `integration` | Yes             |
-| E2E         | Full workflow against real remote host      | manual        | Yes + SSH       |
+| Integration | Real Docker and local filesystem checks     | `integration` | Yes             |
+| E2E         | Full workflow against the real remote host  | `e2e`         | Yes + SSH       |
 
 ### Run Commands
 
@@ -26,14 +26,26 @@ go test -race -count=1 -v -timeout=120s ./...
 
 # Unit + integration
 go test -race -count=1 -v -timeout=120s -tags=integration ./...
+
+# E2E against the real remote host
+go test -race -count=1 -v -timeout=120s -tags=e2e ./...
+
+# Full non-unit suite
+go test -race -count=1 -v -timeout=120s -tags='integration e2e' ./...
 ```
 
 ## Integration Test Rules
 
 - Gate with build tag: `//go:build integration`
-- Use real Docker commands — no mocks for Docker or SSH
-- For SSH tests without a remote host, use localhost SSH (ssh to self)
+- Use real Docker commands — no mocks for Docker
 - Clean up containers/images created during tests
+
+## E2E Test Rules
+
+- Gate with build tag: `//go:build e2e`
+- Use the real SSH test host
+- Expect Docker and SSH access to be available
+- Keep these tests out of the default `integration` tag
 
 ## Test Server (E2E)
 

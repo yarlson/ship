@@ -26,6 +26,7 @@ func registryRunning(t *testing.T) bool {
 }
 
 func TestRegistry_StartsContainer(t *testing.T) {
+	requireDocker(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
@@ -39,6 +40,7 @@ func TestRegistry_StartsContainer(t *testing.T) {
 }
 
 func TestRegistry_ReusesExisting(t *testing.T) {
+	requireDocker(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
@@ -62,6 +64,7 @@ func TestRegistry_ReusesExisting(t *testing.T) {
 }
 
 func TestRegistry_PortConflict(t *testing.T) {
+	requireDocker(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 
@@ -84,6 +87,7 @@ func TestRegistry_PortConflict(t *testing.T) {
 }
 
 func TestRegistry_ProgressOutput(t *testing.T) {
+	requireDocker(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
