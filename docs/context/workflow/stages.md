@@ -1,8 +1,20 @@
 # 7-Stage Deployment Pipeline
 
+## Preflight Validation
+
+Before any stages execute, `workflow.Preflight(cfg)` runs these checks in order:
+
+1. **Docker check** — Verify Docker is installed and accessible via `docker version`
+2. **Docker Compose V2 check** — Verify `docker compose` plugin is available
+3. **SSH check** — Verify `ssh` command is installed
+4. **Key file check** — Verify SSH key file exists and is readable via `os.Stat`
+5. **SSH connectivity check** — Test SSH connection to remote host with `ssh -i <key> <user>@<host> true` and connection timeout of 10 seconds
+
+If any check fails, the workflow exits immediately with a descriptive error (e.g., "Docker is not installed or not in PATH") and hint text (e.g., "verify the --key path"). No stages are executed.
+
 ## Stage Sequence
 
-The workflow runs these 7 stages in order, each with a start and completion message printed in `[N/7]` format:
+The workflow runs these 7 stages in order (after preflight validation succeeds), each with a start and completion message printed in `[N/7]` format:
 
 ### Stage 1: Build Images
 
@@ -156,4 +168,6 @@ The workflow runs these 7 stages in order, each with a start and completion mess
 
 ## Error Handling
 
-Each stage will return error or nil. Workflow stops on first failure and exits with error (fail-fast).
+**Preflight errors:** Exit immediately before any stages run with error message and hint (e.g., "Docker is not installed or not in PATH").
+
+**Stage errors:** Each stage returns error or nil. Stage failures are wrapped in `StageError` with metadata (stage number, stage name, underlying error, optional hint). Workflow stops on first failure and exits with `StageError` (fail-fast). Error format: `<error message> — <hint>` or just `<error message>` if no hint.

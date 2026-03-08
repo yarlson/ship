@@ -20,6 +20,9 @@
 - **Help text** — Defined as constant in `cli.go`, includes examples.
 - **Validation** — All required flags checked. Missing flags listed by name.
 - **Error messages** — User-facing errors name what failed and what to check (no secrets in output).
+- **Stage errors** — All stage failures wrapped in `StageError` type with stage number and name for consistent error reporting.
+- **Capitalized errors** — Capitalized error strings require `//nolint:staticcheck // user-facing message per OUTPUT.md spec` comment.
+- **Preflight checks** — Run before pipeline execution. Fail fast on first check failure with hint text (e.g., "verify the --key path").
 
 ## Module Boundaries
 

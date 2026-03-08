@@ -15,6 +15,7 @@
 ### Workflow Domain
 
 - `workflow/stages.md` — 7-stage pipeline definition and flow
+- `workflow/validation.md` — Preflight validation checks and StageError error handling
 
 ### Docker Domain
 

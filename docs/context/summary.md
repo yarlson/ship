@@ -41,11 +41,23 @@ main → cli.Parse() → workflow.Run()
 
 1. **Entry** — `main.go` calls `cli.Parse(args)` to extract Config
 2. **Validation** — Config has required flags or returns error
-3. **Orchestration** — `workflow.Run(cfg)` executes 7 stages sequentially
-4. **Progress** — Each stage prints `[N/7] message` lines
-5. **Exit** — Workflow returns nil on success or error on failure
+3. **Preflight checks** — `workflow.Preflight(cfg)` validates Docker, Docker Compose V2, SSH, key file, and connectivity before any stages run
+4. **Orchestration** — `workflow.Run(cfg)` executes preflight checks then 7 stages sequentially
+5. **Progress** — Each stage prints `[N/7] message` lines
+6. **Exit** — Workflow returns nil on success or error on failure
 
 ## System State
+
+**Preflight validation:**
+
+Before any stages run, `Preflight(cfg)` checks:
+- Docker is installed and accessible
+- Docker Compose V2 plugin is available
+- SSH client is installed
+- SSH key file exists and is readable
+- SSH connectivity to remote host works
+
+If any check fails, the workflow exits immediately with a descriptive error message and hint.
 
 **Implemented stages:**
 
@@ -80,7 +92,8 @@ main → cli.Parse() → workflow.Run()
 
 ✓ Parse and validate all required CLI flags
 ✓ Display help text with usage examples
-✓ Fail fast with clear error messages naming what failed
+✓ Run preflight checks before pipeline: Docker, Docker Compose V2, SSH, key file, connectivity
+✓ Fail fast with clear error messages naming what failed and what to check
 ✓ Print stage progress in `[N/7]` format
 ✓ Run 7-stage workflow in sequence with cleanup
 ✓ Build Docker Compose images and discover built images (Stage 1)

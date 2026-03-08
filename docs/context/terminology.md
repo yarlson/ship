@@ -33,3 +33,7 @@
 **Output passthrough** — Sending remote command output directly to stdout/stderr without reformatting or suppression. Used in Stage 7 to show deployment command output to the user.
 
 **Tunnel lifecycle** — The sequence: (1) start tunnel in Stage 5, (2) use in Stages 6-7, (3) cleanup via deferred `cleanupTunnel()` on workflow exit. Ensures tunnel is always stopped even on error.
+
+**Preflight checks** — Validation checks run at workflow start before any stages execute. Verify Docker, Docker Compose V2, SSH, SSH key file, and connectivity to remote host. Exit immediately on first failure with a clear error message and hint.
+
+**StageError** — Structured error type that wraps stage failures with metadata: stage number, stage name, underlying error, and optional hint. Formatted for user-facing output: `<error message> — <hint>` or just `<error message>` if no hint.
