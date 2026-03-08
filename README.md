@@ -78,16 +78,37 @@ If preflight passes, progress is printed in a consistent `[N/5]` format.
 
 ## Install
 
-Build from source:
+Homebrew:
 
 ```bash
-go build -o ship .
+brew tap yarlson/tap
+brew install --cask ship
 ```
 
-Show help:
+Direct download from GitHub Releases:
+
+1. Pick the archive that matches your machine:
+   - `ship_<version>_darwin_amd64.tar.gz`
+   - `ship_<version>_darwin_arm64.tar.gz`
+   - `ship_<version>_linux_amd64.tar.gz`
+   - `ship_<version>_linux_arm64.tar.gz`
+
+2. Download, unpack, and install it:
 
 ```bash
-./ship --help
+VERSION=0.1.0
+ARCHIVE=ship_${VERSION}_darwin_arm64.tar.gz
+
+curl -LO https://github.com/yarlson/ship/releases/download/v${VERSION}/${ARCHIVE}
+tar -xzf ${ARCHIVE}
+chmod +x ship
+sudo mv ship /usr/local/bin/ship
+```
+
+3. Verify it:
+
+```bash
+ship --help
 ```
 
 ## Development
