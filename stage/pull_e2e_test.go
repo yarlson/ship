@@ -43,7 +43,7 @@ func TestPull_PullsAndRestoresImage(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	assert.Contains(t, out, "[5/5] Pulling and restoring image on remote host...")
+	assert.Contains(t, out, "[5/5] Pulling and restoring images on remote host...")
 	assert.Contains(t, out, "[5/5] Pull and restore complete")
 }
 

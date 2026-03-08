@@ -9,7 +9,7 @@ import (
 
 // Push executes Stage 3: push the transfer-tagged image to the local registry.
 func Push(transfers []string) error {
-	progress.StageStart(3, "Pushing image to local registry")
+	progress.StageStart(3, progressMessage(len(transfers), "Pushing image", "Pushing images")+" to local registry")
 
 	for _, transfer := range transfers {
 		if err := docker.PushImage(transfer); err != nil {

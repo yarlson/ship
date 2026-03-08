@@ -11,7 +11,7 @@ import (
 // Pull executes Stage 5: pull the image from the tunnel endpoint on the remote host
 // and restore its original tag.
 func Pull(cfg cli.Config, originals, transfers []string) error {
-	progress.StageStart(5, "Pulling and restoring image on remote host")
+	progress.StageStart(5, progressMessage(len(originals), "Pulling and restoring image", "Pulling and restoring images")+" on remote host")
 
 	for i, original := range originals {
 		transfer := transfers[i]

@@ -40,6 +40,24 @@ func TestPrintSummary_Format(t *testing.T) {
 	assert.Contains(t, out, "Status:   Success")
 }
 
+func TestPrintSummary_SingularLabel(t *testing.T) {
+	cfg := cli.Config{
+		Host:   "h.example.com",
+		Images: []string{"app:latest"},
+	}
+	state := &State{
+		OriginalImages: []string{"app:latest"},
+		TransferImages: []string{"localhost:5001/app:latest"},
+	}
+
+	out := captureSummaryOutput(func() {
+		printSummary(cfg, state)
+	})
+
+	assert.Contains(t, out, "Image:    app:latest")
+	assert.NotContains(t, out, "Images:")
+}
+
 func TestPrintSummary_LabelAlignment(t *testing.T) {
 	cfg := cli.Config{
 		Host:   "host",

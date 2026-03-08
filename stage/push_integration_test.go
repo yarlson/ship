@@ -55,7 +55,7 @@ func TestRegistryAndPush_HappyPath(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	assert.Contains(t, out, "[3/5] Pushing image to local registry...")
+	assert.Contains(t, out, "[3/5] Pushing images to local registry...")
 	assert.Contains(t, out, "[3/5] Push complete")
 
 	tags := queryRegistryTags(t, "ship-inttest-push")

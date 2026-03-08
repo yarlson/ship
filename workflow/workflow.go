@@ -68,9 +68,9 @@ func wrapStageErr(stageNum int, name string, err error) *StageError {
 // printSummary prints the success summary block to stdout.
 func printSummary(cfg cli.Config, state *State) {
 	fmt.Fprintln(progress.Writer, "Ship complete")
-	fmt.Fprintf(progress.Writer, "  Host:     %s\n", cfg.Host)
-	fmt.Fprintf(progress.Writer, "  Images:   %s\n", strings.Join(state.OriginalImages, ", "))
-	fmt.Fprintln(progress.Writer, "  Status:   Success")
+	printSummaryLine("Host", cfg.Host)
+	printSummaryLine(summaryLabel(len(state.OriginalImages)), strings.Join(state.OriginalImages, ", "))
+	printSummaryLine("Status", "Success")
 }
 
 // cleanupTunnel stops the SSH tunnel process if it is running.
@@ -81,4 +81,16 @@ func cleanupTunnel(state *State) {
 	if err := ssh.StopTunnel(state.TunnelCmd); err != nil {
 		fmt.Fprintf(progress.Writer, "Warning: tunnel cleanup failed: %s\n", err)
 	}
+}
+
+func summaryLabel(count int) string {
+	if count == 1 {
+		return "Image"
+	}
+
+	return "Images"
+}
+
+func printSummaryLine(label, value string) {
+	fmt.Fprintf(progress.Writer, "  %-10s%s\n", label+":", value)
 }

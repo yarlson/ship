@@ -24,7 +24,7 @@ func TestTag_CreatesTransferTag(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	assert.Contains(t, out, "[1/5] Tagging image for transfer...")
+	assert.Contains(t, out, "[1/5] Tagging images for transfer...")
 	assert.Contains(t, out, "[1/5] Tag complete")
 
 	for _, transfer := range transfers {
