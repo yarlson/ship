@@ -90,7 +90,11 @@ func TestRegistry_ProgressOutput(t *testing.T) {
 	requireDocker(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
-	t.Cleanup(func() { testlock.StopRegistry(t) })
+	testlock.WaitPort5001Free(t)
+	t.Cleanup(func() {
+		testlock.StopRegistry(t)
+		testlock.WaitPort5001Free(t)
+	})
 
 	out := captureOutput(func() {
 		err := Registry()
