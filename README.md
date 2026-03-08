@@ -1,32 +1,62 @@
 # ship
 
-`ship` deploys Docker Compose images to a remote host without building on that host.
+Build here. Run there.
 
-It builds your images locally, pushes them through a temporary local registry exposed over an SSH reverse tunnel, restores the original image tags on the remote machine, and then runs your deploy command.
+If the source code and Docker cache live on your machine, but deployment happens on a remote host, there is an annoying gap: the server needs fresh images, but building there is slow, fragile, or not allowed.
 
-This is useful when:
+`ship` closes that gap for Docker Compose projects. It builds images locally, transfers them to the remote host over SSH, restores their original tags, and runs your deploy command.
 
-- builds should happen on the machine that already has source code and build cache
-- the remote host should only pull images and run `docker compose`
-- the remote host already has the Compose project checked out, but not the freshly built images
+The problem it solves is simple:
 
-## What `ship` actually does
+- local builds are faster because the code and cache are already there
+- remote hosts should run containers, not act like build machines
+- copying source code around just to rebuild is unnecessary
 
-`ship` does not copy source code or Compose files to the remote host.
+`ship` keeps the build where it belongs and gets the result onto the host that needs to run it.
 
-It does this in one run:
+It is especially useful when a full registry setup feels like too much:
 
-1. builds images from your local Compose file set
-2. tags them as `localhost:5001/...`
-3. starts a local Docker registry on port `5001`
-4. pushes the images into that registry
-5. opens an SSH reverse tunnel so the remote host can reach that registry
-6. pulls the images on the remote host and restores their original tags
-7. runs your remote deploy command
+- running and securing a private registry is extra operational work
+- paying for a hosted registry can be hard to justify for one app or one server
+- pushing to Docker Hub just to redeploy a personal project is often the wrong level of ceremony
 
-## What must already exist
+If SSH already exists, `ship` gives you a shorter path: build locally, transfer over the tunnel, deploy.
 
-On the local machine:
+## How It Works
+
+One `ship` run does this:
+
+1. builds images from your Compose files
+2. discovers which services actually produce images
+3. tags those images as `localhost:5001/...`
+4. starts a local registry on port `5001`
+5. pushes the images into that registry
+6. opens an SSH reverse tunnel so the remote host can reach it
+7. pulls the images remotely, restores the original tags, and runs your command
+
+## What It Does Not Do
+
+`ship` does not:
+
+- copy source code to the remote host
+- sync Compose files to the remote host
+- replace your deploy logic
+- manage Docker on the remote host for you
+
+The remote host still needs the project checkout if your deploy command expects it.
+
+## When It Fits
+
+Use `ship` when:
+
+- the remote host already has the Compose project checked out
+- images should be built locally or in CI, not on the server
+- SSH access exists but a full registry setup feels like overkill
+- you want to avoid registry credentials, registry operations, and another paid service for a small deployment
+
+## Requirements
+
+Local machine:
 
 - Go `1.25.0+` if building from source
 - Docker with Compose V2
@@ -34,12 +64,12 @@ On the local machine:
 - the Compose file(s) you want to build from
 - an SSH private key that can reach the remote host
 
-On the remote host:
+Remote host:
 
-- `ssh` access for the target user
+- SSH access for the target user
 - Docker installed and running
 - the Compose project already present if your command expects it
-- a free port `5001` on the remote side for the reverse tunnel
+- port `5001` available for the reverse tunnel
 
 ## Install
 
@@ -58,7 +88,7 @@ Show help:
 ## Usage
 
 ```bash
-ship \
+./ship \
   --docker-compose <compose.yml[,override.yml]> \
   --user <ssh-user> \
   --host <host> \
@@ -86,7 +116,7 @@ Local machine:
 Remote host:
 
 - already has the same Compose project checked out
-- should restart services with the newly shipped images
+- should restart services with the freshly transferred images
 
 ```bash
 ./ship \
@@ -97,7 +127,7 @@ Remote host:
   --command "cd /srv/app && docker compose -f compose.yml -f compose.prod.yml up -d"
 ```
 
-If the remote host needs to pull external images referenced by the Compose file, do that in the command you pass:
+If the remote host also needs to pull external images referenced by the Compose files, include that in your command:
 
 ```bash
 ./ship \
@@ -108,9 +138,9 @@ If the remote host needs to pull external images referenced by the Compose file,
   --command "cd /srv/app && docker compose -f compose.yml -f compose.prod.yml pull && docker compose -f compose.yml -f compose.prod.yml up -d"
 ```
 
-## What `ship` checks before it starts
+## Preflight Checks
 
-Before running any stage, `ship` fails fast if any of these are missing or broken:
+Before the first stage starts, `ship` fails fast if any of these are missing or broken:
 
 - Docker
 - Docker Compose V2
@@ -119,14 +149,14 @@ Before running any stage, `ship` fails fast if any of these are missing or broke
 - every Compose file passed to `--docker-compose`
 - SSH connectivity to `--user@--host`
 
-If preflight passes, stage progress is printed in a consistent `[N/7]` format and the final remote command output is passed through directly.
+If preflight passes, stage progress is printed in a consistent `[N/7]` format and the remote command output is passed through directly.
 
 ## Constraints
 
-- `ship` only transfers images built from services that have a Compose `build` key.
-- The local registry port is fixed at `5001`.
-- The transfer path depends on SSH reverse port forwarding to the remote host.
-- `ship` restores original image tags on the remote host, then runs exactly the command you provide.
+- only services with a Compose `build` key are transferred
+- the transfer registry is fixed at `localhost:5001`
+- the deploy path depends on SSH reverse port forwarding
+- `ship` runs exactly the remote command you provide
 
 ## Development
 
@@ -154,7 +184,7 @@ Integration tests:
 go test -race -count=1 -v -timeout=120s -tags=integration ./...
 ```
 
-E2E tests against the remote host:
+E2E tests:
 
 ```bash
 export SHIP_E2E_USER=deploy
