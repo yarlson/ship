@@ -26,6 +26,9 @@ func Preflight(cfg cli.Config) error {
 	if err := checkKeyFile(cfg.KeyPath); err != nil {
 		return err
 	}
+	if err := checkComposeFiles(cfg.ComposeFiles); err != nil {
+		return err
+	}
 	if err := checkSSHConnectivity(cfg.KeyPath, cfg.User, cfg.Host); err != nil {
 		return err
 	}
@@ -80,6 +83,20 @@ func checkKeyFile(keyPath string) error {
 	}
 	if info.IsDir() {
 		return fmt.Errorf("SSH key file not found: %s — verify the --key path", keyPath)
+	}
+	return nil
+}
+
+// checkComposeFiles verifies each compose file path exists.
+func checkComposeFiles(paths []string) error {
+	for _, p := range paths {
+		cleanPath := filepath.Clean(p)
+		if _, err := os.Stat(cleanPath); err != nil { //nolint:gosec // compose path is user-provided CLI flag, path traversal is expected
+			if os.IsNotExist(err) {
+				return fmt.Errorf("Compose file not found: %s", p) //nolint:staticcheck // user-facing message per DESIGN.md spec
+			}
+			return fmt.Errorf("Cannot read compose file: %s — check file permissions", p) //nolint:staticcheck // user-facing message per DESIGN.md spec
+		}
 	}
 	return nil
 }

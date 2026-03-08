@@ -52,7 +52,7 @@ func TestBuild_RealComposeFile(t *testing.T) {
 	var imageMap map[string]string
 	out := captureOutput(func() {
 		var err error
-		imageMap, err = Build(composePath)
+		imageMap, err = Build([]string{composePath})
 		require.NoError(t, err)
 	})
 
@@ -79,7 +79,7 @@ func TestBuild_NoImages(t *testing.T) {
 	require.NoError(t, os.WriteFile(compose, []byte(content), 0o600))
 
 	_ = captureOutput(func() {
-		_, err := Build(compose)
+		_, err := Build([]string{compose})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "No images found after build")
 	})

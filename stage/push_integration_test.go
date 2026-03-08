@@ -43,7 +43,7 @@ func TestRegistryAndPush_HappyPath_E2E(t *testing.T) {
 	var imageMap map[string]string
 	captureOutput(func() {
 		var err error
-		imageMap, err = Build(composePath)
+		imageMap, err = Build([]string{composePath})
 		require.NoError(t, err)
 	})
 
@@ -88,7 +88,7 @@ func TestPush_PushesImagesToRegistry(t *testing.T) {
 	var imageMap map[string]string
 	captureOutput(func() {
 		var err error
-		imageMap, err = Build(composePath)
+		imageMap, err = Build([]string{composePath})
 		require.NoError(t, err)
 	})
 	captureOutput(func() {
@@ -123,7 +123,7 @@ func TestPush_ReportsImageCount(t *testing.T) {
 	var imageMap map[string]string
 	captureOutput(func() {
 		var err error
-		imageMap, err = Build(composePath)
+		imageMap, err = Build([]string{composePath})
 		require.NoError(t, err)
 	})
 	captureOutput(func() {

@@ -18,7 +18,7 @@ func TestTag_CreatesTransferTags(t *testing.T) {
 	var imageMap map[string]string
 	captureOutput(func() {
 		var err error
-		imageMap, err = Build(composePath)
+		imageMap, err = Build([]string{composePath})
 		require.NoError(t, err)
 	})
 
@@ -42,7 +42,7 @@ func TestBuildAndTag_HappyPath_E2E(t *testing.T) {
 	var imageMap map[string]string
 	out := captureOutput(func() {
 		var err error
-		imageMap, err = Build(composePath)
+		imageMap, err = Build([]string{composePath})
 		require.NoError(t, err)
 	})
 

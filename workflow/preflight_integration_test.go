@@ -38,7 +38,7 @@ func TestPreflight_PassesWithValidConfig(t *testing.T) {
 	keyPath, user, host := testSSHConfig(t)
 	composePath := setupComposeProject(t)
 	cfg := cli.Config{
-		ComposeFiles: composePath,
+		ComposeFiles: []string{composePath},
 		User:         user,
 		Host:         host,
 		KeyPath:      keyPath,

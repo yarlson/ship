@@ -157,6 +157,47 @@ func TestTransferTag_MultipleSlashes(t *testing.T) {
 	assert.Equal(t, "localhost:5001/registry.example.com/org/app:v1", TransferTag(img))
 }
 
+func TestFilterBuiltImages_ExcludesPulledOnly(t *testing.T) {
+	input := `{
+		"name": "myproject",
+		"services": {
+			"web": {"build": {"context": "."}, "image": "web:latest"},
+			"redis": {"image": "redis:alpine"}
+		}
+	}`
+
+	images, err := ParseComposeConfig([]byte(input))
+	require.NoError(t, err)
+	require.Len(t, images, 1)
+	assert.Equal(t, "web", images[0].Name)
+}
+
+func TestFilterBuiltImages_MultiFile(t *testing.T) {
+	// Simulates merged multi-file config output with mixed build/pull services.
+	input := `{
+		"name": "myproject",
+		"services": {
+			"web": {"build": {"context": "."}, "image": "web:latest"},
+			"worker": {"build": {"context": "./worker"}, "image": "worker:latest"},
+			"redis": {"image": "redis:alpine"},
+			"postgres": {"image": "postgres:16"}
+		}
+	}`
+
+	images, err := ParseComposeConfig([]byte(input))
+	require.NoError(t, err)
+	assert.Len(t, images, 2)
+
+	names := map[string]bool{}
+	for _, img := range images {
+		names[img.Name] = true
+	}
+	assert.True(t, names["web"])
+	assert.True(t, names["worker"])
+	assert.False(t, names["redis"])
+	assert.False(t, names["postgres"])
+}
+
 func TestParseRegistryContainerFilter(t *testing.T) {
 	assert.True(t, ParseRegistryContainerFilter("abc123def456\n"))
 }

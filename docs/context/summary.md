@@ -51,6 +51,7 @@ main → cli.Parse() → workflow.Run()
 **Preflight validation:**
 
 Before any stages run, `Preflight(cfg)` checks:
+
 - Docker is installed and accessible
 - Docker Compose V2 plugin is available
 - SSH client is installed

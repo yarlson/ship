@@ -9,7 +9,7 @@ import (
 
 // Config holds the parsed CLI flags.
 type Config struct {
-	ComposeFiles string
+	ComposeFiles []string
 	User         string
 	Host         string
 	KeyPath      string
@@ -36,6 +36,23 @@ Examples:
 
 const usageLine = "Usage: ship --docker-compose <path> --user <user> --host <host> --key <path> --command <cmd>"
 
+// splitComposeFiles splits a comma-separated string into a slice of trimmed paths.
+// Returns nil if input is empty or contains only whitespace/commas.
+func splitComposeFiles(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	var result []string
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
 // Parse parses CLI flags from args and returns a Config.
 // Returns flag.ErrHelp when --help is requested.
 // Returns an error listing all missing flags if any required flag is absent or empty.
@@ -44,7 +61,8 @@ func Parse(args []string) (Config, error) {
 	fs.SetOutput(io.Discard)
 
 	var cfg Config
-	fs.StringVar(&cfg.ComposeFiles, "docker-compose", "", "")
+	var rawCompose string
+	fs.StringVar(&rawCompose, "docker-compose", "", "")
 	fs.StringVar(&cfg.User, "user", "", "")
 	fs.StringVar(&cfg.Host, "host", "", "")
 	fs.StringVar(&cfg.KeyPath, "key", "", "")
@@ -54,8 +72,16 @@ func Parse(args []string) (Config, error) {
 		return Config{}, err
 	}
 
+	cfg.ComposeFiles = splitComposeFiles(rawCompose)
+
+	// Track which flags were explicitly provided.
+	explicitlySet := make(map[string]bool)
+	fs.Visit(func(f *flag.Flag) {
+		explicitlySet[f.Name] = true
+	})
+
 	var missing []string
-	if cfg.ComposeFiles == "" {
+	if len(cfg.ComposeFiles) == 0 {
 		missing = append(missing, "--docker-compose")
 	}
 	if cfg.User == "" {
@@ -67,7 +93,14 @@ func Parse(args []string) (Config, error) {
 	if cfg.KeyPath == "" {
 		missing = append(missing, "--key")
 	}
-	if strings.TrimSpace(cfg.Command) == "" {
+
+	commandEmpty := strings.TrimSpace(cfg.Command) == ""
+	switch {
+	case !explicitlySet["command"]:
+		missing = append(missing, "--command")
+	case commandEmpty && len(missing) == 0:
+		return Config{}, fmt.Errorf("Empty --command flag — provide the command to run on the remote host") //nolint:staticcheck // user-facing message per DESIGN.md spec
+	case commandEmpty:
 		missing = append(missing, "--command")
 	}
 

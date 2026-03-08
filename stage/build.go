@@ -2,7 +2,6 @@ package stage
 
 import (
 	"fmt"
-	"strings"
 
 	"ship/docker"
 	"ship/progress"
@@ -10,16 +9,14 @@ import (
 
 // Build executes Stage 1: docker compose build and image discovery.
 // Returns a map of original image ref → localhost:5001/ transfer tag.
-func Build(composeFiles string) (map[string]string, error) {
+func Build(composeFiles []string) (map[string]string, error) {
 	progress.StageStart(1, "Building images")
 
-	files := strings.Split(composeFiles, ",")
-
-	if err := docker.ComposeBuild(files); err != nil {
+	if err := docker.ComposeBuild(composeFiles); err != nil {
 		return nil, fmt.Errorf("Build failed — see docker compose output above")
 	}
 
-	images, err := docker.ComposeConfig(files)
+	images, err := docker.ComposeConfig(composeFiles)
 	if err != nil {
 		return nil, fmt.Errorf("Build failed — %w", err)
 	}

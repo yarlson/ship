@@ -200,6 +200,109 @@ func TestShip_UnreachableHost_FailsBeforeStages(t *testing.T) {
 	assert.NotContains(t, stdout.String(), "[1/7]")
 }
 
+func TestShip_MissingComposeFile_FailsBeforeStages(t *testing.T) {
+	composePath := setupComposeProject(t)
+
+	composeArg := composePath + ",/tmp/nonexistent-compose.yml"
+	cmd := exec.CommandContext(context.Background(), binaryPath,
+		"--docker-compose", composeArg,
+		"--user", "root",
+		"--host", "46.101.213.82",
+		"--key", testSSHKeyPath(t),
+		"--command", "echo deployed",
+	)
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	require.Error(t, err, "exit code should be non-zero")
+	errOut := stderr.String()
+	assert.Contains(t, errOut, "Compose file not found: /tmp/nonexistent-compose.yml")
+	// No stage lines should appear.
+	assert.NotContains(t, stdout.String(), "[1/7]")
+}
+
+func TestShip_EmptyCommand_FailsBeforeStages(t *testing.T) {
+	composePath := setupComposeProject(t)
+
+	cmd := exec.CommandContext(context.Background(), binaryPath,
+		"--docker-compose", composePath,
+		"--user", "root",
+		"--host", "46.101.213.82",
+		"--key", testSSHKeyPath(t),
+		"--command", "",
+	)
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	require.Error(t, err, "exit code should be non-zero")
+	errOut := stderr.String()
+	assert.Contains(t, errOut, "Empty --command flag")
+	assert.Contains(t, errOut, "provide the command to run on the remote host")
+	// No stage lines should appear.
+	assert.NotContains(t, stdout.String(), "[1/7]")
+}
+
+func TestShip_MultiFileCompose_E2E(t *testing.T) {
+	testlock.Port5001(t)
+	testlock.StopRegistry(t)
+	t.Cleanup(func() { testlock.StopRegistry(t) })
+
+	dir := t.TempDir()
+	dockerfile := filepath.Join(dir, "Dockerfile")
+	require.NoError(t, os.WriteFile(dockerfile, []byte("FROM alpine:latest\nRUN echo hello\n"), 0o600))
+
+	base := filepath.Join(dir, "compose.yml")
+	baseContent := `services:
+  web:
+    build:
+      context: .
+      platforms:
+        - linux/amd64
+    image: ship-mfe2e-web:latest
+    platform: linux/amd64
+  redis:
+    image: redis:alpine
+`
+	require.NoError(t, os.WriteFile(base, []byte(baseContent), 0o600))
+
+	override := filepath.Join(dir, "compose.prod.yml")
+	overrideContent := `services:
+  web:
+    environment:
+      - NODE_ENV=production
+`
+	require.NoError(t, os.WriteFile(override, []byte(overrideContent), 0o600))
+
+	composeArg := base + "," + override
+	cmd := exec.CommandContext(context.Background(), binaryPath,
+		"--docker-compose", composeArg,
+		"--user", "root",
+		"--host", "46.101.213.82",
+		"--key", testSSHKeyPath(t),
+		"--command", "echo deployed",
+	)
+	out, err := cmd.Output()
+	require.NoError(t, err, "exit code should be 0, stderr: %s", string(out))
+
+	stdout := string(out)
+
+	// All 7 stages should complete.
+	stagePattern := regexp.MustCompile(`\[\d/7\]`)
+	assert.True(t, stagePattern.MatchString(stdout))
+
+	// Success summary shows original image name, not transfer tag.
+	assert.Contains(t, stdout, "Ship complete")
+	assert.Contains(t, stdout, "ship-mfe2e-web:latest")
+	assert.NotContains(t, stdout, "redis")
+
+	// Build reports 1 image (only web has build key).
+	assert.Contains(t, stdout, "Build complete (1 images)")
+}
+
 func TestShip_TransferTagsExist(t *testing.T) {
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)

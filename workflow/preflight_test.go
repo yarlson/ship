@@ -76,6 +76,60 @@ func TestCheckKeyFile_UnreadableFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "check file permissions")
 }
 
+func TestCheckComposeFiles_AllExist(t *testing.T) {
+	f1, err := os.CreateTemp("", "ship-compose-1-*.yml")
+	require.NoError(t, err)
+	defer os.Remove(f1.Name())
+	f1.Close()
+
+	f2, err := os.CreateTemp("", "ship-compose-2-*.yml")
+	require.NoError(t, err)
+	defer os.Remove(f2.Name())
+	f2.Close()
+
+	assert.NoError(t, checkComposeFiles([]string{f1.Name(), f2.Name()}))
+}
+
+func TestCheckComposeFiles_FirstMissing(t *testing.T) {
+	f, err := os.CreateTemp("", "ship-compose-*.yml")
+	require.NoError(t, err)
+	defer os.Remove(f.Name())
+	f.Close()
+
+	err = checkComposeFiles([]string{"/tmp/nonexistent.yml", f.Name()})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Compose file not found: /tmp/nonexistent.yml")
+}
+
+func TestCheckComposeFiles_SecondMissing(t *testing.T) {
+	f, err := os.CreateTemp("", "ship-compose-*.yml")
+	require.NoError(t, err)
+	defer os.Remove(f.Name())
+	f.Close()
+
+	err = checkComposeFiles([]string{f.Name(), "/tmp/nonexistent.yml"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Compose file not found: /tmp/nonexistent.yml")
+}
+
+func TestCheckComposeFiles_SingleFile(t *testing.T) {
+	f, err := os.CreateTemp("", "ship-compose-*.yml")
+	require.NoError(t, err)
+	defer os.Remove(f.Name())
+	f.Close()
+
+	assert.NoError(t, checkComposeFiles([]string{f.Name()}))
+}
+
+func TestCheckComposeFiles_ErrorIncludesPath(t *testing.T) {
+	err := checkComposeFiles([]string{"/tmp/no-such-compose.yml"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "/tmp/no-such-compose.yml")
+}
+
 func TestPreflight_ErrorFormat_NoEmoji(t *testing.T) {
 	err := checkKeyFile("/tmp/no-such-key")
 	require.Error(t, err)

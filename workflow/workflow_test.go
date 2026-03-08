@@ -74,7 +74,7 @@ func TestRun_PrintsAllSevenStages(t *testing.T) {
 	composePath := setupComposeProject(t)
 	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
-		ComposeFiles: composePath,
+		ComposeFiles: []string{composePath},
 		User:         user,
 		Host:         host,
 		KeyPath:      keyPath,
@@ -100,7 +100,7 @@ func TestRun_StagesInOrder(t *testing.T) {
 	composePath := setupComposeProject(t)
 	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
-		ComposeFiles: composePath,
+		ComposeFiles: []string{composePath},
 		User:         user,
 		Host:         host,
 		KeyPath:      keyPath,
@@ -138,7 +138,7 @@ func TestRun_ReturnsNilOnSuccess(t *testing.T) {
 	composePath := setupComposeProject(t)
 	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
-		ComposeFiles: composePath,
+		ComposeFiles: []string{composePath},
 		User:         user,
 		Host:         host,
 		KeyPath:      keyPath,
@@ -161,7 +161,7 @@ func TestWorkflow_FullSevenStages(t *testing.T) {
 	composePath := setupComposeProject(t)
 	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
-		ComposeFiles: composePath,
+		ComposeFiles: []string{composePath},
 		User:         user,
 		Host:         host,
 		KeyPath:      keyPath,
@@ -198,7 +198,7 @@ func TestWorkflow_TunnelCleanedUpOnSuccess(t *testing.T) {
 	composePath := setupComposeProject(t)
 	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
-		ComposeFiles: composePath,
+		ComposeFiles: []string{composePath},
 		User:         user,
 		Host:         host,
 		KeyPath:      keyPath,
@@ -223,7 +223,7 @@ func TestWorkflow_TunnelCleanedUpOnFailure(t *testing.T) {
 	composePath := setupComposeProject(t)
 	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
-		ComposeFiles: composePath,
+		ComposeFiles: []string{composePath},
 		User:         user,
 		Host:         host,
 		KeyPath:      keyPath,
