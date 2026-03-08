@@ -22,7 +22,7 @@ Runs:
 docker image inspect <imageRef>
 ```
 
-Used during preflight to verify the local image exists before any stage runs.
+Used during preflight to verify each requested local image exists before any stage runs.
 
 ### `TagImage(source, target string) error`
 

@@ -4,7 +4,7 @@ The workflow runs 5 stages after preflight succeeds.
 
 ## Stage 1: Tag
 
-**Message:** `[1/5] Tagging image for transfer...` → `[1/5] Tag complete`
+**Message:** `[1/5] Tagging image for transfer...` or `[1/5] Tagging images for transfer...` → `[1/5] Tag complete`
 
 - input: original image refs
 - action: create `localhost:5001/<image>` transfer tags
@@ -20,7 +20,7 @@ The workflow runs 5 stages after preflight succeeds.
 
 ## Stage 3: Push
 
-**Message:** `[3/5] Pushing image to local registry...` → `[3/5] Push complete`
+**Message:** `[3/5] Pushing image to local registry...` or `[3/5] Pushing images to local registry...` → `[3/5] Push complete`
 
 - input: transfer tags
 - action: push the transfer tags into the local registry
@@ -36,7 +36,7 @@ The workflow runs 5 stages after preflight succeeds.
 
 ## Stage 5: Pull And Restore
 
-**Message:** `[5/5] Pulling and restoring image on remote host...` → `[5/5] Pull and restore complete`
+**Message:** `[5/5] Pulling and restoring image on remote host...` or `[5/5] Pulling and restoring images on remote host...` → `[5/5] Pull and restore complete`
 
 - input: SSH config, original image refs, transfer tags
 - action:

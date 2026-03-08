@@ -27,9 +27,9 @@ Ship runs these stages in order:
 
 1. tag each local image as `localhost:5001/<image>`
 2. ensure a local registry is running on `:5001`
-3. push the transfer tag to that local registry
+3. push the transfer tags to that local registry
 4. open an SSH reverse tunnel so the remote host can reach the local registry
-5. run remote `docker pull` and `docker tag` commands to restore the original image tag
+5. run remote `docker pull` and `docker tag` commands to restore the original image tags
 
 ## Preflight
 

@@ -13,15 +13,15 @@ Transfer local Docker images to a remote host over SSH, without setting up a rem
 
 ## What It Does
 
-One `ship` run does this for each image:
+One `ship` run does this:
 
-1. verifies the local image exists
-2. tags it as `localhost:5001/<image>`
+1. verifies each local image exists
+2. tags each image as `localhost:5001/<image>`
 3. starts a local registry on port `5001`
-4. pushes the transfer tag into that registry
+4. pushes the transfer tags into that registry
 5. opens an SSH reverse tunnel to the remote host
-6. pulls the transfer tag on the remote host
-7. restores the original image tag on the remote host
+6. pulls the transfer tags on the remote host
+7. restores the original image tags on the remote host
 
 That is it.
 

@@ -28,15 +28,15 @@ Example:
 
 ## Current Stage Messages
 
-- `[1/5] Tagging image for transfer...`
+- `[1/5] Tagging image for transfer...` or `[1/5] Tagging images for transfer...`
 - `[1/5] Tag complete`
 - `[2/5] Starting local registry...`
 - `[2/5] Registry ready`
-- `[3/5] Pushing image to local registry...`
+- `[3/5] Pushing image to local registry...` or `[3/5] Pushing images to local registry...`
 - `[3/5] Push complete`
 - `[4/5] Establishing tunnel to <host>...`
 - `[4/5] Tunnel established`
-- `[5/5] Pulling and restoring image on remote host...`
+- `[5/5] Pulling and restoring image on remote host...` or `[5/5] Pulling and restoring images on remote host...`
 - `[5/5] Pull and restore complete`
 
 ## Testability
