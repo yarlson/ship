@@ -64,7 +64,7 @@ func checkKeyFile(keyPath string) error {
 	}
 
 	cleanPath := filepath.Clean(keyPath)
-	info, err := os.Stat(cleanPath) //nolint:gosec // keyPath is user-provided CLI input, path traversal is expected
+	info, err := os.Stat(cleanPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("SSH key file not found: %s — verify the -i path", keyPath)

@@ -20,7 +20,7 @@ func queryRegistryTags(t *testing.T, name string) []string {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("http://localhost:5001/v2/%s/tags/list", name), http.NoBody)
 	require.NoError(t, err)
 
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec // test-only, URL is hardcoded localhost
+	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
