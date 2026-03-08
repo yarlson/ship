@@ -41,6 +41,7 @@ Executes: `docker compose -f file1 -f file2 ... config --format json`
 - Returns list of Image structs
 
 **Error handling:** Two failure points:
+
 - Command execution: `docker compose config: <err>`
 - JSON parsing: `parse compose config: <err>`
 
@@ -65,6 +66,7 @@ Parses an image reference string into Name and Tag:
 - Default tag is "latest" if no tag present
 
 Examples:
+
 - `web:latest` → Image{Name: "web", Tag: "latest"}
 - `ghcr.io/org/app:v1` → Image{Name: "ghcr.io/org/app", Tag: "v1"}
 - `localhost:5001/web` → Image{Name: "localhost:5001/web", Tag: "latest"}
@@ -75,6 +77,7 @@ Examples:
 Returns: `localhost:5001/` + img.Ref()
 
 Examples:
+
 - Image{Name: "web", Tag: "latest"} → "localhost:5001/web:latest"
 - Image{Name: "api", Tag: "v2"} → "localhost:5001/api:v2"
 
@@ -98,6 +101,7 @@ The `docker compose config --format json` output is parsed to extract services:
 ```
 
 **Extraction logic:**
+
 1. Iterate through services
 2. Skip services without "build" key (or with null build)
 3. Extract image name from "image" field

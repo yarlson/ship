@@ -5,11 +5,13 @@
 Progress output follows a consistent `[N/7]` format to help users track deployment through all 7 stages.
 
 **Stage start:**
+
 ```
 [N/7] message...
 ```
 
 **Stage completion:**
+
 ```
 [N/7] message
 ```
@@ -40,6 +42,7 @@ Progress output follows a consistent `[N/7]` format to help users track deployme
 **File:** `progress/progress.go`
 
 **API:**
+
 - `StageStart(stage int, msg string)` — Print `[N/7] message...`
 - `StageComplete(stage int, msg string)` — Print `[N/7] message`
 

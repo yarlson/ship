@@ -156,3 +156,12 @@ func TestTransferTag_MultipleSlashes(t *testing.T) {
 	img := Image{Name: "registry.example.com/org/app", Tag: "v1"}
 	assert.Equal(t, "localhost:5001/registry.example.com/org/app:v1", TransferTag(img))
 }
+
+func TestParseRegistryContainerFilter(t *testing.T) {
+	assert.True(t, ParseRegistryContainerFilter("abc123def456\n"))
+}
+
+func TestParseRegistryContainerFilter_Empty(t *testing.T) {
+	assert.False(t, ParseRegistryContainerFilter(""))
+	assert.False(t, ParseRegistryContainerFilter("  \n"))
+}

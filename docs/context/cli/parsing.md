@@ -13,12 +13,14 @@
 **File:** `cli/cli.go`
 
 **Flow:**
+
 1. `Parse(args)` creates a FlagSet with all 5 required flags
 2. Parses arguments
 3. Validates all flags are present and non-empty
 4. Returns typed `Config` struct or error listing missing flags
 
 **Config struct:**
+
 ```go
 type Config struct {
     ComposeFiles string  // Comma-separated paths
@@ -34,6 +36,7 @@ type Config struct {
 Help text is a constant with usage and examples. Displayed on `--help` flag.
 
 **Example invocation:**
+
 ```bash
 ship --docker-compose docker-compose.yml \
      --user deploy \
@@ -51,6 +54,7 @@ ship --docker-compose docker-compose.yml \
 ## Testing
 
 Tests in `cli/cli_test.go` verify:
+
 - Valid Config accepted
 - Missing flags detected and reported
 - Help flag handling

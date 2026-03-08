@@ -15,6 +15,7 @@ import (
 
 	"ship/cli"
 	"ship/progress"
+	"ship/testlock"
 )
 
 func captureOutput(fn func()) string {
@@ -50,6 +51,9 @@ func setupComposeProject(t *testing.T) string {
 }
 
 func TestRun_PrintsAllSevenStages(t *testing.T) {
+	testlock.Port5001(t)
+	testlock.StopRegistry(t)
+	t.Cleanup(func() { testlock.StopRegistry(t) })
 	composePath := setupComposeProject(t)
 	cfg := cli.Config{
 		ComposeFiles: composePath,
@@ -72,6 +76,9 @@ func TestRun_PrintsAllSevenStages(t *testing.T) {
 }
 
 func TestRun_StagesInOrder(t *testing.T) {
+	testlock.Port5001(t)
+	testlock.StopRegistry(t)
+	t.Cleanup(func() { testlock.StopRegistry(t) })
 	composePath := setupComposeProject(t)
 	cfg := cli.Config{
 		ComposeFiles: composePath,
@@ -106,6 +113,9 @@ func TestRun_StagesInOrder(t *testing.T) {
 }
 
 func TestRun_ReturnsNilOnSuccess(t *testing.T) {
+	testlock.Port5001(t)
+	testlock.StopRegistry(t)
+	t.Cleanup(func() { testlock.StopRegistry(t) })
 	composePath := setupComposeProject(t)
 	cfg := cli.Config{
 		ComposeFiles: composePath,

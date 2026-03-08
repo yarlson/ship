@@ -61,6 +61,11 @@ CLI Flags → cli.Parse() → Config
 - **Shared mutable state** — `WorkflowState` struct with `ImageMap` and `TunnelCmd`, passed by pointer. No channels, no mutexes.
 - **Fixed registry port** — `localhost:5001` is hardcoded (M-11).
 
+## Implementation Status
+
+- **Stages 1–4**: Real implementations with Docker operations and error handling
+- **Stages 5–7**: Stub implementations with hardcoded progress output
+
 ## Detailed Specs
 
 Full requirements, design rules, and task breakdown live in `.snap/sessions/default/tasks/`:

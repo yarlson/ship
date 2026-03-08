@@ -116,6 +116,7 @@ func Run(cfg cli.Config) error {
 ```
 
 **Flow:**
+
 1. Stage 1 builds and returns ImageMap
 2. Stage 2 receives ImageMap, tags all images
 3. Stages 3-7 execute with stub implementations

@@ -13,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"ship/testlock"
 )
 
 func setupComposeProject(t *testing.T) string {
@@ -39,6 +41,9 @@ func setupComposeProject(t *testing.T) string {
 }
 
 func TestShip_AllFlags_PrintsSevenStages(t *testing.T) {
+	testlock.Port5001(t)
+	testlock.StopRegistry(t)
+	t.Cleanup(func() { testlock.StopRegistry(t) })
 	composePath := setupComposeProject(t)
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,
@@ -119,6 +124,9 @@ func TestShip_NoBuildServices_FailsWithError(t *testing.T) {
 }
 
 func TestShip_TransferTagsExist(t *testing.T) {
+	testlock.Port5001(t)
+	testlock.StopRegistry(t)
+	t.Cleanup(func() { testlock.StopRegistry(t) })
 	composePath := setupComposeProject(t)
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,

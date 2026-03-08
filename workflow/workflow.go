@@ -12,15 +12,13 @@ type stubStage struct {
 }
 
 var stubs = []stubStage{
-	{"Starting local registry", "Registry ready"},
-	{"Pushing images to local registry", "Push complete"},
 	{"Establishing tunnel", "Tunnel established"},
 	{"Pulling and restoring images on remote host", "Pull and restore complete"},
 	{"Running remote command", "Command complete"},
 }
 
 // Run executes the 7-stage workflow.
-// Stages 1-2 are real implementations; stages 3-7 remain stubs.
+// Stages 1-4 are real implementations; stages 5-7 remain stubs.
 func Run(cfg cli.Config) error {
 	// Stage 1: Build
 	imageMap, err := stage.Build(cfg.ComposeFiles)
@@ -33,9 +31,19 @@ func Run(cfg cli.Config) error {
 		return err
 	}
 
-	// Stages 3-7: stubs
+	// Stage 3: Registry
+	if err := stage.Registry(); err != nil {
+		return err
+	}
+
+	// Stage 4: Push
+	if err := stage.Push(imageMap); err != nil {
+		return err
+	}
+
+	// Stages 5-7: stubs
 	for i, s := range stubs {
-		n := i + 3
+		n := i + 5
 		progress.StageStart(n, s.startMsg)
 		progress.StageComplete(n, s.completeMsg)
 	}

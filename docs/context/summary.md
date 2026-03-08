@@ -3,6 +3,7 @@
 ## What
 
 Ship is a Go CLI tool that orchestrates a 7-stage deployment pipeline:
+
 1. Build Docker Compose images locally
 2. Tag images with local registry prefix
 3. Start local registry container
@@ -26,6 +27,7 @@ main → cli.Parse() → workflow.Run()
 ```
 
 **Core modules:**
+
 - `cli/` — flag parsing and validation
 - `workflow/` — stage orchestration and pipeline sequencing
 - `progress/` — progress output formatting
@@ -46,16 +48,19 @@ main → cli.Parse() → workflow.Run()
 ## System State
 
 **Implemented stages:**
+
 - Stage 1 (Build) — Real: runs `docker compose build`, discovers built images via `docker compose config`
 - Stage 2 (Tag) — Real: re-tags images with `localhost:5001/` prefix using ImageMap pattern
 - Stages 3-7 — Stub implementations with hardcoded progress messages
 
 **Data flow across stages:**
+
 - Stage 1 returns ImageMap (original name → transfer tag mapping)
 - Stage 2 receives ImageMap and tags all images
 - Stages 3-7 stubs execute independently
 
 **Module boundaries enforced:**
+
 - `cli` — only flag parsing, no I/O
 - `docker` — Docker CLI operations (build, config, tag)
 - `stage` — stage business logic (orchestration, image tracking)
