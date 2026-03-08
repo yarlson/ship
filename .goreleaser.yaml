@@ -1,0 +1,50 @@
+version: 2
+
+project_name: ship
+
+release:
+  github:
+    owner: yarlson
+    name: ship
+
+builds:
+  - id: ship
+    main: ./
+    binary: ship
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: ship
+    ids:
+      - ship
+    formats:
+      - tar.gz
+
+checksum:
+  name_template: checksums.txt
+
+homebrew_casks:
+  - name: ship
+    ids:
+      - ship
+    binaries:
+      - ship
+    repository:
+      owner: yarlson
+      name: homebrew-tap
+      branch: main
+    commit_author:
+      name: github-actions[bot]
+      email: 41898282+github-actions[bot]@users.noreply.github.com
+    commit_msg_template: "chore(cask): update ship to {{ .Tag }}"
+    directory: Casks
+    homepage: https://github.com/yarlson/ship
+    description: Transfer a local Docker image to a remote host over SSH.
+    skip_upload: "{{ .IsSnapshot }}"
