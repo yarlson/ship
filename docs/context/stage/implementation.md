@@ -8,17 +8,16 @@ Stages 1-4 have real implementations. Stages 5-7 are stubs that print hardcoded 
 
 ## Stage 1: Build
 
-**Function:** `Build(composeFiles string) (map[string]string, error)`
+**Function:** `Build(composeFiles []string) (map[string]string, error)`
 
 ### Flow
 
 1. Print `[1/7] Building images...` via `progress.StageStart()`
-2. Parse comma-separated compose file paths
-3. Call `docker.ComposeBuild(files)` — runs `docker compose build`
-4. Call `docker.ComposeConfig(files)` — parses config JSON to get images
-5. Build ImageMap: map original image ref → transfer tag
-6. Print `[1/7] Build complete (N images)` via `progress.StageComplete()`
-7. Return (imageMap, nil) on success
+2. Call `docker.ComposeBuild(composeFiles)` — runs `docker compose build` with all provided files
+3. Call `docker.ComposeConfig(composeFiles)` — parses config JSON to get images
+4. Build ImageMap: map original image ref → transfer tag
+5. Print `[1/7] Build complete (N images)` via `progress.StageComplete()`
+6. Return (imageMap, nil) on success
 
 ### ImageMap Construction
 

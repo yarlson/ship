@@ -92,12 +92,13 @@ If any check fails, the workflow exits immediately with a descriptive error mess
 ## Capabilities
 
 ✓ Parse and validate all required CLI flags
+✓ Support single or multiple Docker Compose files (comma-separated `--docker-compose`)
 ✓ Display help text with usage examples
-✓ Run preflight checks before pipeline: Docker, Docker Compose V2, SSH, key file, connectivity
+✓ Run preflight checks before pipeline: Docker, Docker Compose V2, SSH, key file, compose files, connectivity
 ✓ Fail fast with clear error messages naming what failed and what to check
 ✓ Print stage progress in `[N/7]` format
 ✓ Run 7-stage workflow in sequence with cleanup
-✓ Build Docker Compose images and discover built images (Stage 1)
+✓ Build Docker Compose images from multiple files and discover built images (Stage 1)
 ✓ Tag images with local registry prefix (Stage 2)
 ✓ Check registry status, detect port conflicts, start registry on :5001 (Stage 3)
 ✓ Push transfer-tagged images to local registry (Stage 4)

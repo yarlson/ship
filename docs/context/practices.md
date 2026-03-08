@@ -22,7 +22,7 @@
 - **Error messages** — User-facing errors name what failed and what to check (no secrets in output).
 - **Stage errors** — All stage failures wrapped in `StageError` type with stage number and name for consistent error reporting.
 - **Capitalized errors** — Capitalized error strings require `//nolint:staticcheck // user-facing message per OUTPUT.md spec` comment.
-- **Preflight checks** — Run before pipeline execution. Fail fast on first check failure with hint text (e.g., "verify the --key path").
+- **Preflight checks** — Run before pipeline execution in sequence: Docker, Docker Compose V2, SSH, SSH key file, compose files, SSH connectivity. Fail fast on first check failure with hint text (e.g., "verify the --key path").
 
 ## Module Boundaries
 
@@ -35,11 +35,12 @@
 
 ## Stage Implementation Pattern
 
-- **Stage functions:** Named `stage.Build(cfg)`, `stage.Tag(imageMap)`, etc. Each takes required inputs and returns (result, error).
+- **Stage functions:** Named `stage.Build(composeFiles)`, `stage.Tag(imageMap)`, etc. Each takes required inputs and returns (result, error).
+- **Multifile support:** `Build()` receives `[]string` of compose file paths (pre-parsed and validated by preflight checks).
 - **Progress calls:** Each stage opens with `progress.StageStart(n, msg)` and closes with `progress.StageComplete(n, msg)`. Between them are the real operations.
 - **Error flow:** Stages return errors which bubble up to `workflow.Run()`. Errors contain context (what operation, why it failed).
 - **Data passing:** ImageMap pattern used to pass image metadata between stages (Stage 1 → 2 → 4, 6). TunnelProcess passed through workflow state (Stage 5 → cleanup).
-- **Docker operations:** `docker.ComposeBuild()`, `docker.ComposeConfig()`, `docker.TagImage()` handle CLI invocation and error wrapping.
+- **Docker operations:** `docker.ComposeBuild()`, `docker.ComposeConfig()`, `docker.TagImage()` handle CLI invocation and error wrapping. All support multiple files.
 
 ## SSH Tunnel Lifecycle
 

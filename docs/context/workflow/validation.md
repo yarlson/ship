@@ -23,11 +23,17 @@ Preflight checks run at the start of `workflow.Run()` before any stages execute.
    - Error on unreadable: `Cannot read SSH key file: <path> — check file permissions`
    - Hint included in error message
 
-5. **SSH connectivity** — `ssh -i <key> -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o BatchMode=yes <user>@<host> true` returns 0
+5. **Compose files accessible** — `os.Stat(filepath.Clean(path))` succeeds for each file in `cfg.ComposeFiles`
+   - Error on not found: `Compose file not found: <path>`
+   - Error on unreadable: `Cannot read compose file: <path> — check file permissions`
+   - Returns on first missing/unreadable file
+   - Validates all files exist before any stages run
+
+6. **SSH connectivity** — `ssh -i <key> -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o BatchMode=yes <user>@<host> true` returns 0
    - Error: `SSH connection failed — verify --host and --key`
    - Hint included in error message
 
-**Exit behavior:** Returns on first failure. No stages execute if any check fails.
+**Exit behavior:** Checks run sequentially. Returns on first failure. No stages execute if any preflight check fails.
 
 ## StageError Type
 
