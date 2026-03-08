@@ -11,6 +11,8 @@ Transfer local Docker images to a remote host over SSH, without setting up a rem
 
 `ship` does one job: move one or more local images to a remote host through a local registry exposed over an SSH reverse tunnel, then restore the original tags on the remote side.
 
+That local registry is there for a reason: Docker transfers layers, not whole images every time. `ship` keeps that behavior, so only new or changed layers need to move. You get the same incremental upload/pull pattern you would get with a registry, without first pushing those layers to Docker Hub or some other remote registry.
+
 ## What It Does
 
 One `ship` run does this:
