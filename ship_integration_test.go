@@ -137,9 +137,9 @@ func TestShip_NoBuildServices_FailsWithError(t *testing.T) {
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,
 		"--docker-compose", compose,
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
+		"--user", "root",
+		"--host", "46.101.213.82",
+		"--key", testSSHKeyPath(t),
 		"--command", "docker compose up -d",
 	)
 	var stderr strings.Builder
@@ -148,6 +148,56 @@ func TestShip_NoBuildServices_FailsWithError(t *testing.T) {
 
 	require.Error(t, err, "exit code should be non-zero")
 	assert.Contains(t, stderr.String(), "No images found after build")
+}
+
+func TestShip_BadKeyPath_FailsBeforeStages(t *testing.T) {
+	composePath := setupComposeProject(t)
+
+	cmd := exec.CommandContext(context.Background(), binaryPath,
+		"--docker-compose", composePath,
+		"--user", "root",
+		"--host", "46.101.213.82",
+		"--key", "/tmp/nonexistent-key-ship-test",
+		"--command", "echo deployed",
+	)
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	require.Error(t, err, "exit code should be non-zero")
+	errOut := stderr.String()
+	assert.Contains(t, errOut, "SSH key file not found")
+	assert.Contains(t, errOut, "/tmp/nonexistent-key-ship-test")
+	assert.Contains(t, errOut, "--key")
+	// No stage lines should appear.
+	assert.NotContains(t, stdout.String(), "[1/7]")
+}
+
+func TestShip_UnreachableHost_FailsBeforeStages(t *testing.T) {
+	composePath := setupComposeProject(t)
+	keyPath := testSSHKeyPath(t)
+
+	cmd := exec.CommandContext(context.Background(), binaryPath,
+		"--docker-compose", composePath,
+		"--user", "root",
+		"--host", "192.0.2.1",
+		"--key", keyPath,
+		"--command", "echo deployed",
+	)
+	cmd.Env = append(os.Environ(), "SSH_AUTH_SOCK=") // Disable agent to force key-only auth.
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	require.Error(t, err, "exit code should be non-zero")
+	errOut := stderr.String()
+	assert.Contains(t, errOut, "SSH connection failed")
+	assert.Contains(t, errOut, "--host")
+	assert.Contains(t, errOut, "--key")
+	// No stage lines should appear.
+	assert.NotContains(t, stdout.String(), "[1/7]")
 }
 
 func TestShip_TransferTagsExist(t *testing.T) {

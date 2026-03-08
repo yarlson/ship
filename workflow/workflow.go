@@ -17,52 +17,65 @@ type State struct {
 	TunnelCmd *ssh.TunnelProcess
 }
 
-// Run executes the 7-stage workflow.
+// Run executes preflight checks followed by the 7-stage workflow.
 func Run(cfg cli.Config) error {
+	if err := Preflight(cfg); err != nil {
+		return err
+	}
+
 	state := &State{}
 
 	// Stage 1: Build
 	imageMap, err := stage.Build(cfg.ComposeFiles)
 	if err != nil {
-		return err
+		return wrapStageErr(1, "Build", err)
 	}
 	state.ImageMap = imageMap
 
 	// Stage 2: Tag
 	if err := stage.Tag(imageMap); err != nil {
-		return err
+		return wrapStageErr(2, "Tag", err)
 	}
 
 	// Stage 3: Registry
 	if err := stage.Registry(); err != nil {
-		return err
+		return wrapStageErr(3, "Registry", err)
 	}
 
 	// Stage 4: Push
 	if err := stage.Push(imageMap); err != nil {
-		return err
+		return wrapStageErr(4, "Push", err)
 	}
 
 	// Stage 5: Tunnel
 	tp, err := stage.Tunnel(cfg)
 	if err != nil {
-		return err
+		return wrapStageErr(5, "Tunnel", err)
 	}
 	state.TunnelCmd = tp
 	defer cleanupTunnel(state)
 
 	// Stage 6: Pull & Restore
 	if err := stage.Pull(cfg, imageMap); err != nil {
-		return err
+		return wrapStageErr(6, "Pull", err)
 	}
 
 	// Stage 7: Command
 	if err := stage.Command(cfg); err != nil {
-		return err
+		return wrapStageErr(7, "Command", err)
 	}
 
 	printSummary(cfg, state)
 	return nil
+}
+
+// wrapStageErr wraps a stage error in StageError for consistent formatting.
+func wrapStageErr(stageNum int, name string, err error) *StageError {
+	return &StageError{
+		Stage: stageNum,
+		Name:  name,
+		Err:   err,
+	}
 }
 
 // printSummary prints the success summary block to stdout.

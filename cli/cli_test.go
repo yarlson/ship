@@ -2,6 +2,7 @@ package cli
 
 import (
 	"flag"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -102,6 +103,25 @@ func TestParse_WhitespaceOnlyCommand(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--command")
+}
+
+func TestParse_MissingFlagsFormat(t *testing.T) {
+	_, err := Parse([]string{"--user", "deploy", "--host", "example.com", "--key", "key.pem", "--command", "echo"})
+
+	require.Error(t, err)
+	msg := err.Error()
+	// Single line for missing flags, not one per flag.
+	assert.Contains(t, msg, "Missing required flags: --docker-compose")
+}
+
+func TestParse_MissingFlagsUsageLine(t *testing.T) {
+	_, err := Parse([]string{})
+
+	require.Error(t, err)
+	msg := err.Error()
+	lines := strings.SplitN(msg, "\n", 2)
+	require.Len(t, lines, 2)
+	assert.Equal(t, "Usage: ship --docker-compose <path> --user <user> --host <host> --key <path> --command <cmd>", lines[1])
 }
 
 func TestParse_Help(t *testing.T) {

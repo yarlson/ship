@@ -20,9 +20,12 @@ Go CLI tool that builds Docker Compose images locally, transfers them to a remot
 
 ```
 CLI flags → cli.Parse → workflow.Run(cfg)
+  → Preflight(cfg) [docker, compose V2, ssh, key file, SSH connectivity]
   → stage.Build → stage.Tag → stage.Registry → stage.Push
   → stage.Tunnel → stage.Pull → stage.Command → printSummary
 ```
+
+Stage errors wrapped in `StageError` (stage number, name, underlying error, hint) for consistent formatting.
 
 ## Package Structure
 
@@ -30,7 +33,7 @@ CLI flags → cli.Parse → workflow.Run(cfg)
 - `docker/` — compose config parsing, image tag/push/pull (shells out to `docker`)
 - `ssh/` — remote command execution, tunnel lifecycle management
 - `stage/` — one function per pipeline stage
-- `workflow/` — orchestration, state management, cleanup, summary output
+- `workflow/` — orchestration, state management, cleanup, summary output, preflight checks, StageError type
 - `progress/` — `Writer` (swappable `io.Writer`) for testable progress output
 - `testlock/` — port 5001 mutex and registry cleanup for parallel integration tests
 

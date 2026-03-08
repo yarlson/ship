@@ -11,8 +11,17 @@ Build, transfer, and deploy Docker Compose images to a remote host in a single c
 ## Prerequisites
 
 - Go 1.25.0 or later
-- Docker (with Docker Compose)
-- SSH access to the remote host
+- Docker (with Docker Compose V2)
+- SSH access to the remote host with a private key
+
+Before running the pipeline, `ship` validates all prerequisites:
+- Docker is installed and accessible
+- Docker Compose V2 plugin is available
+- SSH is installed
+- SSH key file exists and is readable
+- SSH connectivity to the remote host works
+
+If any check fails, `ship` exits immediately with a clear error message before any stages run.
 
 ## Install
 
@@ -88,6 +97,34 @@ ship --docker-compose compose.yml,compose.prod.yml --user root --host staging.ex
 | 7     | Execute remote command via SSH               | Implemented |
 
 ## Troubleshooting
+
+### Docker or Docker Compose not found
+
+**Symptom**: `Error: Docker is not installed or not in PATH` or `Error: docker compose (V2) is required`
+
+**Fix**:
+- Install [Docker Desktop](https://www.docker.com/products/docker-desktop) or Docker Engine
+- Ensure Docker Compose V2 is installed: `docker compose version`
+- If using Docker Engine, install the [Compose plugin](https://docs.docker.com/compose/install/linux/#install-using-the-repository)
+
+### SSH key file not found or unreadable
+
+**Symptom**: `Error: SSH key file not found: /path/to/key — verify the --key path`
+
+**Fix**:
+- Verify the `--key` path is correct
+- Use `~` for home directory expansion (e.g., `~/.ssh/id_ed25519`)
+- Check file permissions: `ls -la ~/.ssh/id_ed25519`
+
+### SSH connection failed
+
+**Symptom**: `Error: SSH connection failed — verify --host and --key`
+
+**Fix**:
+- Verify the remote `--host` is reachable and correct
+- Verify the `--key` matches a private key on your system
+- Check SSH access: `ssh -i ~/.ssh/id_ed25519 user@host echo ok`
+- Ensure the remote user (via `--user`) has SSH access configured
 
 ### Port 5001 is required
 
