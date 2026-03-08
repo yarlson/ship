@@ -34,6 +34,14 @@ go test -race -count=1 -v -timeout=120s -tags=e2e ./...
 go test -race -count=1 -v -timeout=120s -tags='integration e2e' ./...
 ```
 
+Set E2E target configuration with environment variables:
+
+```bash
+export SHIP_E2E_USER=deploy
+export SHIP_E2E_HOST=staging.example.com
+export SHIP_E2E_KEY=~/.ssh/id_ed25519
+```
+
 ## Integration Test Rules
 
 - Gate with build tag: `//go:build integration`
@@ -43,19 +51,9 @@ go test -race -count=1 -v -timeout=120s -tags='integration e2e' ./...
 ## E2E Test Rules
 
 - Gate with build tag: `//go:build e2e`
-- Use the real SSH test host
+- Configure the SSH test host via `SHIP_E2E_USER`, `SHIP_E2E_HOST`, and `SHIP_E2E_KEY`
 - Expect Docker and SSH access to be available
 - Keep these tests out of the default `integration` tag
-
-## Test Server (E2E)
-
-For full end-to-end testing against a real remote host:
-
-```
-Host: 46.101.213.82
-User: root
-Key:  ~/.ssh/id_rsa
-```
 
 ## Testify Usage
 

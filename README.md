@@ -157,6 +157,9 @@ go test -race -count=1 -v -timeout=120s -tags=integration ./...
 E2E tests against the remote host:
 
 ```bash
+export SHIP_E2E_USER=deploy
+export SHIP_E2E_HOST=staging.example.com
+export SHIP_E2E_KEY=~/.ssh/id_ed25519
 go test -race -count=1 -v -timeout=120s -tags=e2e ./...
 ```
 

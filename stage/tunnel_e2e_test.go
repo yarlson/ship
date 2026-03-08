@@ -28,7 +28,7 @@ func TestTunnel_EstablishesAndStoresInState(t *testing.T) {
 	})
 
 	assert.NotNil(t, tunnelCmd)
-	assert.Contains(t, out, "[5/7] Establishing tunnel to 46.101.213.82...")
+	assert.Contains(t, out, "[5/7] Establishing tunnel to "+cfg.Host+"...")
 	assert.Contains(t, out, "[5/7] Tunnel established")
 }
 

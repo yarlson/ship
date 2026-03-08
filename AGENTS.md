@@ -16,6 +16,9 @@ go test -race -count=1 -v -timeout=120s ./...
 go test -race -count=1 -v -timeout=120s -tags=integration ./...
 
 # E2E tests (require Docker + SSH test host)
+export SHIP_E2E_USER=deploy
+export SHIP_E2E_HOST=staging.example.com
+export SHIP_E2E_KEY=~/.ssh/id_ed25519
 go test -race -count=1 -v -timeout=120s -tags=e2e ./...
 
 # Format docs
@@ -30,12 +33,14 @@ bunx prettier --write "**/*.md"
 - Fail fast, fail clearly — every error names what failed and what to check
 - No secrets in output — key paths are OK, key contents never
 
-## Test Server
+## E2E Test Config
+
+Configure the remote target with:
 
 ```
-Host: 46.101.213.82
-User: root
-Key:  ~/.ssh/id_rsa
+SHIP_E2E_USER=<ssh-user>
+SHIP_E2E_HOST=<ssh-host>
+SHIP_E2E_KEY=<path-to-private-key>
 ```
 
 ## Detailed Docs

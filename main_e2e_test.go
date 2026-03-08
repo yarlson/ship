@@ -14,34 +14,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"ship/testenv"
 	"ship/testlock"
 )
 
-func requireE2EPrereqs(t *testing.T) {
-	t.Helper()
-
-	dockerCmd := exec.CommandContext(context.Background(), "docker", "version")
-	if err := dockerCmd.Run(); err != nil {
-		t.Skipf("skipping e2e test: Docker daemon unavailable: %v", err)
-	}
-
-	keyPath := testSSHKeyPath(t)
-	sshCmd := exec.CommandContext(context.Background(), "ssh",
-		"-i", keyPath,
-		"-o", "ConnectTimeout=5",
-		"-o", "StrictHostKeyChecking=accept-new",
-		"-o", "BatchMode=yes",
-		"root@46.101.213.82",
-		"true",
-	)
-	if err := sshCmd.Run(); err != nil {
-		t.Skipf("skipping e2e test: SSH test host unavailable: %v", err)
-	}
-}
-
 func setupComposeProject(t *testing.T) string {
 	t.Helper()
-	requireE2EPrereqs(t)
 	dir := t.TempDir()
 
 	dockerfile := filepath.Join(dir, "Dockerfile")
@@ -71,18 +49,8 @@ func setupComposeProject(t *testing.T) string {
 	return compose
 }
 
-func testSSHKeyPath(t *testing.T) string {
-	t.Helper()
-	home, err := os.UserHomeDir()
-	require.NoError(t, err)
-	keyPath := home + "/.ssh/id_rsa"
-	if _, err := os.Stat(keyPath); err != nil {
-		t.Skipf("skipping e2e test: SSH key unavailable: %v", err)
-	}
-	return keyPath
-}
-
 func TestShip_AllFlags_PrintsSevenStages(t *testing.T) {
+	cfg := testenv.RequireE2EConfig(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
@@ -90,9 +58,9 @@ func TestShip_AllFlags_PrintsSevenStages(t *testing.T) {
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,
 		"--docker-compose", composePath,
-		"--user", "root",
-		"--host", "46.101.213.82",
-		"--key", testSSHKeyPath(t),
+		"--user", cfg.User,
+		"--host", cfg.Host,
+		"--key", cfg.KeyPath,
 		"--command", "echo deployed",
 	)
 	out, err := cmd.Output()
@@ -142,7 +110,7 @@ func TestShip_AllFlags_PrintsSevenStages(t *testing.T) {
 
 	// Verify success summary is present.
 	assert.Contains(t, stdout, "Ship complete")
-	assert.Contains(t, stdout, "Host:     46.101.213.82")
+	assert.Contains(t, stdout, "Host:     "+cfg.Host)
 	assert.Contains(t, stdout, "Status:   Success")
 
 	// Verify no transfer tags in summary.
@@ -154,7 +122,7 @@ func TestShip_AllFlags_PrintsSevenStages(t *testing.T) {
 }
 
 func TestShip_NoBuildServices_FailsWithError(t *testing.T) {
-	requireE2EPrereqs(t)
+	cfg := testenv.RequireE2EConfig(t)
 	dir := t.TempDir()
 	compose := filepath.Join(dir, "compose.yml")
 	content := `services:
@@ -165,9 +133,9 @@ func TestShip_NoBuildServices_FailsWithError(t *testing.T) {
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,
 		"--docker-compose", compose,
-		"--user", "root",
-		"--host", "46.101.213.82",
-		"--key", testSSHKeyPath(t),
+		"--user", cfg.User,
+		"--host", cfg.Host,
+		"--key", cfg.KeyPath,
 		"--command", "docker compose up -d",
 	)
 	var stderr strings.Builder
@@ -179,12 +147,13 @@ func TestShip_NoBuildServices_FailsWithError(t *testing.T) {
 }
 
 func TestShip_BadKeyPath_FailsBeforeStages(t *testing.T) {
+	cfg := testenv.RequireE2EConfig(t)
 	composePath := setupComposeProject(t)
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,
 		"--docker-compose", composePath,
-		"--user", "root",
-		"--host", "46.101.213.82",
+		"--user", cfg.User,
+		"--host", cfg.Host,
 		"--key", "/tmp/nonexistent-key-ship-test",
 		"--command", "echo deployed",
 	)
@@ -203,14 +172,14 @@ func TestShip_BadKeyPath_FailsBeforeStages(t *testing.T) {
 }
 
 func TestShip_UnreachableHost_FailsBeforeStages(t *testing.T) {
+	cfg := testenv.RequireE2EConfig(t)
 	composePath := setupComposeProject(t)
-	keyPath := testSSHKeyPath(t)
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,
 		"--docker-compose", composePath,
-		"--user", "root",
+		"--user", cfg.User,
 		"--host", "192.0.2.1",
-		"--key", keyPath,
+		"--key", cfg.KeyPath,
 		"--command", "echo deployed",
 	)
 	cmd.Env = append(os.Environ(), "SSH_AUTH_SOCK=") // Disable agent to force key-only auth.
@@ -229,14 +198,15 @@ func TestShip_UnreachableHost_FailsBeforeStages(t *testing.T) {
 }
 
 func TestShip_MissingComposeFile_FailsBeforeStages(t *testing.T) {
+	cfg := testenv.RequireE2EConfig(t)
 	composePath := setupComposeProject(t)
 
 	composeArg := composePath + ",/tmp/nonexistent-compose.yml"
 	cmd := exec.CommandContext(context.Background(), binaryPath,
 		"--docker-compose", composeArg,
-		"--user", "root",
-		"--host", "46.101.213.82",
-		"--key", testSSHKeyPath(t),
+		"--user", cfg.User,
+		"--host", cfg.Host,
+		"--key", cfg.KeyPath,
 		"--command", "echo deployed",
 	)
 	var stdout, stderr strings.Builder
@@ -252,14 +222,14 @@ func TestShip_MissingComposeFile_FailsBeforeStages(t *testing.T) {
 }
 
 func TestShip_EmptyCommand_FailsBeforeStages(t *testing.T) {
-	requireE2EPrereqs(t)
+	cfg := testenv.RequireE2EConfig(t)
 	composePath := setupComposeProject(t)
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,
 		"--docker-compose", composePath,
-		"--user", "root",
-		"--host", "46.101.213.82",
-		"--key", testSSHKeyPath(t),
+		"--user", cfg.User,
+		"--host", cfg.Host,
+		"--key", cfg.KeyPath,
 		"--command", "",
 	)
 	var stdout, stderr strings.Builder
@@ -276,7 +246,7 @@ func TestShip_EmptyCommand_FailsBeforeStages(t *testing.T) {
 }
 
 func TestShip_MultiFileCompose_E2E(t *testing.T) {
-	requireE2EPrereqs(t)
+	cfg := testenv.RequireE2EConfig(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
@@ -310,9 +280,9 @@ func TestShip_MultiFileCompose_E2E(t *testing.T) {
 	composeArg := base + "," + override
 	cmd := exec.CommandContext(context.Background(), binaryPath,
 		"--docker-compose", composeArg,
-		"--user", "root",
-		"--host", "46.101.213.82",
-		"--key", testSSHKeyPath(t),
+		"--user", cfg.User,
+		"--host", cfg.Host,
+		"--key", cfg.KeyPath,
 		"--command", "echo deployed",
 	)
 	out, err := cmd.Output()
@@ -334,7 +304,7 @@ func TestShip_MultiFileCompose_E2E(t *testing.T) {
 }
 
 func TestShip_TransferTagsExist(t *testing.T) {
-	requireE2EPrereqs(t)
+	cfg := testenv.RequireE2EConfig(t)
 	testlock.Port5001(t)
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
@@ -342,9 +312,9 @@ func TestShip_TransferTagsExist(t *testing.T) {
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,
 		"--docker-compose", composePath,
-		"--user", "root",
-		"--host", "46.101.213.82",
-		"--key", testSSHKeyPath(t),
+		"--user", cfg.User,
+		"--host", cfg.Host,
+		"--key", cfg.KeyPath,
 		"--command", "echo deployed",
 	)
 	out, err := cmd.CombinedOutput()
