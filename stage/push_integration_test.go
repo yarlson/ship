@@ -20,7 +20,6 @@ func queryRegistryTags(t *testing.T, name string) []string {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("http://localhost:5001/v2/%s/tags/list", name), http.NoBody)
 	require.NoError(t, err)
 
-	//nolint:gosec // Integration test only; URL host is fixed to the local registry.
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()

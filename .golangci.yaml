@@ -136,6 +136,15 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
+    rules:
+      - path: stage/push_integration_test.go
+        linters:
+          - gosec
+        text: "G704: SSRF via taint analysis"
+      - path: workflow/preflight.go
+        linters:
+          - gosec
+        text: "G703: Path traversal via taint analysis"
     paths:
       - third_party$
       - builtin$
