@@ -141,10 +141,10 @@ E2E tests:
 
 ```bash
 export SHIP_E2E_USER=root
-export SHIP_E2E_HOST=46.101.213.82
+export SHIP_E2E_HOST=staging.example.com
 # Optional if SSH defaults are not enough:
 export SHIP_E2E_KEY=~/.ssh/id_ed25519
-GOCACHE=/tmp/ship-gocache go test -race -count=1 -v -timeout=120s -tags=e2e ./...
+go test -race -count=1 -v -timeout=120s -tags=e2e ./...
 ```
 
 Format docs:
