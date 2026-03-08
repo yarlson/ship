@@ -27,17 +27,32 @@ func setupComposeProject(t *testing.T) string {
 	compose := filepath.Join(dir, "compose.yml")
 	content := `services:
   web:
-    build: .
+    build:
+      context: .
+      platforms:
+        - linux/amd64
     image: ship-test-web:latest
+    platform: linux/amd64
   api:
-    build: .
+    build:
+      context: .
+      platforms:
+        - linux/amd64
     image: ship-test-api:latest
+    platform: linux/amd64
   redis:
     image: redis:alpine
 `
 	require.NoError(t, os.WriteFile(compose, []byte(content), 0o600))
 
 	return compose
+}
+
+func testSSHKeyPath(t *testing.T) string {
+	t.Helper()
+	home, err := os.UserHomeDir()
+	require.NoError(t, err)
+	return home + "/.ssh/id_rsa"
 }
 
 func TestShip_AllFlags_PrintsSevenStages(t *testing.T) {
@@ -48,10 +63,10 @@ func TestShip_AllFlags_PrintsSevenStages(t *testing.T) {
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,
 		"--docker-compose", composePath,
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "docker compose up -d",
+		"--user", "root",
+		"--host", "46.101.213.82",
+		"--key", testSSHKeyPath(t),
+		"--command", "echo deployed",
 	)
 	out, err := cmd.Output()
 	require.NoError(t, err, "exit code should be 0")
@@ -97,6 +112,18 @@ func TestShip_AllFlags_PrintsSevenStages(t *testing.T) {
 	// Verify build stage reports correct image count.
 	assert.Contains(t, stdout, "Build complete (2 images)")
 	assert.Contains(t, stdout, "Tag complete")
+
+	// Verify success summary is present.
+	assert.Contains(t, stdout, "Ship complete")
+	assert.Contains(t, stdout, "Host:     46.101.213.82")
+	assert.Contains(t, stdout, "Status:   Success")
+
+	// Verify no transfer tags in summary.
+	summaryIdx := strings.Index(stdout, "Ship complete")
+	if summaryIdx >= 0 {
+		summary := stdout[summaryIdx:]
+		assert.NotContains(t, summary, "localhost:5001/")
+	}
 }
 
 func TestShip_NoBuildServices_FailsWithError(t *testing.T) {
@@ -131,10 +158,10 @@ func TestShip_TransferTagsExist(t *testing.T) {
 
 	cmd := exec.CommandContext(context.Background(), binaryPath,
 		"--docker-compose", composePath,
-		"--user", "deploy",
-		"--host", "10.0.0.5",
-		"--key", "~/.ssh/id_ed25519",
-		"--command", "docker compose up -d",
+		"--user", "root",
+		"--host", "46.101.213.82",
+		"--key", testSSHKeyPath(t),
+		"--command", "echo deployed",
 	)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "ship should succeed: %s", string(out))

@@ -1,30 +1,32 @@
 package workflow
 
 import (
+	"fmt"
+	"sort"
+	"strings"
+
 	"ship/cli"
 	"ship/progress"
+	"ship/ssh"
 	"ship/stage"
 )
 
-type stubStage struct {
-	startMsg    string
-	completeMsg string
-}
-
-var stubs = []stubStage{
-	{"Establishing tunnel", "Tunnel established"},
-	{"Pulling and restoring images on remote host", "Pull and restore complete"},
-	{"Running remote command", "Command complete"},
+// State holds shared mutable state passed through stages.
+type State struct {
+	ImageMap  map[string]string
+	TunnelCmd *ssh.TunnelProcess
 }
 
 // Run executes the 7-stage workflow.
-// Stages 1-4 are real implementations; stages 5-7 remain stubs.
 func Run(cfg cli.Config) error {
+	state := &State{}
+
 	// Stage 1: Build
 	imageMap, err := stage.Build(cfg.ComposeFiles)
 	if err != nil {
 		return err
 	}
+	state.ImageMap = imageMap
 
 	// Stage 2: Tag
 	if err := stage.Tag(imageMap); err != nil {
@@ -41,12 +43,49 @@ func Run(cfg cli.Config) error {
 		return err
 	}
 
-	// Stages 5-7: stubs
-	for i, s := range stubs {
-		n := i + 5
-		progress.StageStart(n, s.startMsg)
-		progress.StageComplete(n, s.completeMsg)
+	// Stage 5: Tunnel
+	tp, err := stage.Tunnel(cfg)
+	if err != nil {
+		return err
+	}
+	state.TunnelCmd = tp
+	defer cleanupTunnel(state)
+
+	// Stage 6: Pull & Restore
+	if err := stage.Pull(cfg, imageMap); err != nil {
+		return err
 	}
 
+	// Stage 7: Command
+	if err := stage.Command(cfg); err != nil {
+		return err
+	}
+
+	printSummary(cfg, state)
 	return nil
+}
+
+// printSummary prints the success summary block to stdout.
+func printSummary(cfg cli.Config, state *State) {
+	names := make([]string, 0, len(state.ImageMap))
+	for original := range state.ImageMap {
+		names = append(names, original)
+	}
+	sort.Strings(names)
+
+	fmt.Fprintln(progress.Writer, "Ship complete")
+	fmt.Fprintf(progress.Writer, "  Host:     %s\n", cfg.Host)
+	fmt.Fprintf(progress.Writer, "  Images:   %s\n", strings.Join(names, ", "))
+	fmt.Fprintf(progress.Writer, "  Command:  %s\n", cfg.Command)
+	fmt.Fprintln(progress.Writer, "  Status:   Success")
+}
+
+// cleanupTunnel stops the SSH tunnel process if it is running.
+func cleanupTunnel(state *State) {
+	if state.TunnelCmd == nil {
+		return
+	}
+	if err := ssh.StopTunnel(state.TunnelCmd); err != nil {
+		fmt.Fprintf(progress.Writer, "Warning: tunnel cleanup failed: %s\n", err)
+	}
 }

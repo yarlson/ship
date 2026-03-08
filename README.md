@@ -83,19 +83,11 @@ ship --docker-compose compose.yml,compose.prod.yml --user root --host staging.ex
 | 2     | Re-tag images with `localhost:5001/` prefix  | Implemented |
 | 3     | Ensure local registry container on port 5001 | Implemented |
 | 4     | Push images to local registry                | Implemented |
-| 5     | Establish SSH reverse tunnel                 | Stub        |
-| 6     | Pull and restore images on remote host       | Stub        |
-| 7     | Execute remote command via SSH               | Stub        |
+| 5     | Establish SSH reverse tunnel                 | Implemented |
+| 6     | Pull and restore images on remote host       | Implemented |
+| 7     | Execute remote command via SSH               | Implemented |
 
 ## Troubleshooting
-
-### Stages 5-7 are not functional
-
-**Symptom**: Tunnel, pull+restore, and command execution show progress but don't actually execute.
-
-**Cause**: These stages are currently stub implementations with hardcoded progress output.
-
-**Workaround**: Manual SSH tunnel and remote operations are required until these stages are implemented.
 
 ### Port 5001 is required
 

@@ -4,7 +4,9 @@ package workflow
 
 import (
 	"bytes"
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -27,6 +29,13 @@ func captureOutput(fn func()) string {
 	return buf.String()
 }
 
+func testSSHConfig(t *testing.T) (keyPath, user, host string) {
+	t.Helper()
+	home, err := os.UserHomeDir()
+	require.NoError(t, err)
+	return home + "/.ssh/id_rsa", "root", "46.101.213.82"
+}
+
 func setupComposeProject(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -37,11 +46,19 @@ func setupComposeProject(t *testing.T) string {
 	compose := filepath.Join(dir, "compose.yml")
 	content := `services:
   web:
-    build: .
+    build:
+      context: .
+      platforms:
+        - linux/amd64
     image: ship-wftest-web:latest
+    platform: linux/amd64
   api:
-    build: .
+    build:
+      context: .
+      platforms:
+        - linux/amd64
     image: ship-wftest-api:latest
+    platform: linux/amd64
   redis:
     image: redis:alpine
 `
@@ -55,12 +72,13 @@ func TestRun_PrintsAllSevenStages(t *testing.T) {
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
 	composePath := setupComposeProject(t)
+	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
 		ComposeFiles: composePath,
-		User:         "deploy",
-		Host:         "10.0.0.5",
-		KeyPath:      "~/.ssh/id_ed25519",
-		Command:      "docker compose up -d",
+		User:         user,
+		Host:         host,
+		KeyPath:      keyPath,
+		Command:      "echo deployed",
 	}
 
 	out := captureOutput(func() {
@@ -80,12 +98,13 @@ func TestRun_StagesInOrder(t *testing.T) {
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
 	composePath := setupComposeProject(t)
+	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
 		ComposeFiles: composePath,
-		User:         "deploy",
-		Host:         "10.0.0.5",
-		KeyPath:      "~/.ssh/id_ed25519",
-		Command:      "docker compose up -d",
+		User:         user,
+		Host:         host,
+		KeyPath:      keyPath,
+		Command:      "echo deployed",
 	}
 
 	out := captureOutput(func() {
@@ -117,12 +136,13 @@ func TestRun_ReturnsNilOnSuccess(t *testing.T) {
 	testlock.StopRegistry(t)
 	t.Cleanup(func() { testlock.StopRegistry(t) })
 	composePath := setupComposeProject(t)
+	keyPath, user, host := testSSHConfig(t)
 	cfg := cli.Config{
 		ComposeFiles: composePath,
-		User:         "deploy",
-		Host:         "10.0.0.5",
-		KeyPath:      "~/.ssh/id_ed25519",
-		Command:      "docker compose up -d",
+		User:         user,
+		Host:         host,
+		KeyPath:      keyPath,
+		Command:      "echo deployed",
 	}
 
 	var buf bytes.Buffer
@@ -132,4 +152,91 @@ func TestRun_ReturnsNilOnSuccess(t *testing.T) {
 
 	err := Run(cfg)
 	assert.NoError(t, err)
+}
+
+func TestWorkflow_FullSevenStages(t *testing.T) {
+	testlock.Port5001(t)
+	testlock.StopRegistry(t)
+	t.Cleanup(func() { testlock.StopRegistry(t) })
+	composePath := setupComposeProject(t)
+	keyPath, user, host := testSSHConfig(t)
+	cfg := cli.Config{
+		ComposeFiles: composePath,
+		User:         user,
+		Host:         host,
+		KeyPath:      keyPath,
+		Command:      "echo deployment-complete",
+	}
+
+	out := captureOutput(func() {
+		err := Run(cfg)
+		require.NoError(t, err)
+	})
+
+	// All 7 stage progress lines present.
+	for i := 1; i <= 7; i++ {
+		pattern := regexp.MustCompile(`\[` + string(rune('0'+i)) + `/7\]`)
+		assert.True(t, pattern.MatchString(out), "missing stage %d in output", i)
+	}
+
+	// Success summary present.
+	assert.Contains(t, out, "Ship complete")
+	assert.Contains(t, out, "Host:     "+host)
+	assert.Contains(t, out, "Command:  echo deployment-complete")
+	assert.Contains(t, out, "Status:   Success")
+
+	// Image names are original (not transfer tags).
+	assert.Contains(t, out, "ship-wftest-web:latest")
+	assert.Contains(t, out, "ship-wftest-api:latest")
+	assert.NotContains(t, out, "localhost:5001/")
+}
+
+func TestWorkflow_TunnelCleanedUpOnSuccess(t *testing.T) {
+	testlock.Port5001(t)
+	testlock.StopRegistry(t)
+	t.Cleanup(func() { testlock.StopRegistry(t) })
+	composePath := setupComposeProject(t)
+	keyPath, user, host := testSSHConfig(t)
+	cfg := cli.Config{
+		ComposeFiles: composePath,
+		User:         user,
+		Host:         host,
+		KeyPath:      keyPath,
+		Command:      "echo done",
+	}
+
+	captureOutput(func() {
+		err := Run(cfg)
+		require.NoError(t, err)
+	})
+
+	// After workflow completes, no tunnel processes should be running.
+	out, err := exec.CommandContext(context.Background(), "bash", "-c", "ps aux | grep '[s]sh.*-R 5001' | grep -v grep || true").Output()
+	require.NoError(t, err)
+	assert.Empty(t, strings.TrimSpace(string(out)), "tunnel process should be cleaned up after success")
+}
+
+func TestWorkflow_TunnelCleanedUpOnFailure(t *testing.T) {
+	testlock.Port5001(t)
+	testlock.StopRegistry(t)
+	t.Cleanup(func() { testlock.StopRegistry(t) })
+	composePath := setupComposeProject(t)
+	keyPath, user, host := testSSHConfig(t)
+	cfg := cli.Config{
+		ComposeFiles: composePath,
+		User:         user,
+		Host:         host,
+		KeyPath:      keyPath,
+		Command:      "exit 1",
+	}
+
+	captureOutput(func() {
+		err := Run(cfg)
+		assert.Error(t, err)
+	})
+
+	// After workflow error, no tunnel processes should be running.
+	out, err := exec.CommandContext(context.Background(), "bash", "-c", "ps aux | grep '[s]sh.*-R 5001' | grep -v grep || true").Output()
+	require.NoError(t, err)
+	assert.Empty(t, strings.TrimSpace(string(out)), "tunnel process should be cleaned up after failure")
 }
