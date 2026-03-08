@@ -4,7 +4,7 @@
 
 - Go 1.22+
 - `flag` stdlib for CLI parsing — no cobra/urfave
-- Formatting enforced by `golangci-lint run --fix` (gci, gofmt, gofumpt, goimports)
+- Formatting enforced by `golangci-lint run --fix` (gci, gofmt, goimports)
 - Linter config in `.golangci.yaml` — treat all enabled linter findings as errors
 
 ## Error Handling

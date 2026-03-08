@@ -6,7 +6,7 @@ Ship is a Go CLI tool that builds Docker Compose images locally, transfers them 
 # Build
 go build -o ship .
 
-# Lint (includes formatting via gci/gofmt/gofumpt/goimports)
+# Lint (includes formatting via gci/gofmt/goimports)
 golangci-lint run --fix ./...
 
 # Test

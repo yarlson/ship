@@ -64,6 +64,7 @@ func checkKeyFile(keyPath string) error {
 	}
 
 	cleanPath := filepath.Clean(keyPath)
+	//nolint:gosec // The user explicitly provides the SSH identity path; arbitrary local paths are allowed here.
 	info, err := os.Stat(cleanPath)
 	if err != nil {
 		if os.IsNotExist(err) {
