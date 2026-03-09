@@ -1,102 +1,91 @@
 # ship
 
-Transfer local Docker images to a remote host over SSH, without setting up a remote registry.
+Transfer local Docker images to a remote host over SSH, without setting up a remote registry first.
 
-`ship` is for the annoying middle ground where:
+`ship` is for solo developers and small teams who already build images on their own machines and want those exact images on a server. Instead of adding a separate build agent, pushing to a hosted registry, or shuffling tarballs around with `docker save` and `docker load`, `ship` lets the remote host pull the image straight from your machine over SSH.
 
-- the image already exists on your machine
-- the server needs that image
-- building on the server is the wrong move
-- Docker Hub or a private registry feels like extra ceremony
+The point is simple: build locally, transfer directly, keep the original tags, and keep Docker's normal layer-based transfer behavior.
 
-`ship` does one job: move one or more local images to a remote host through a local registry exposed over an SSH reverse tunnel, then restore the original tags on the remote side.
+## Why `ship` exists
 
-That local registry is there for a reason: Docker transfers layers, not whole images every time. `ship` keeps that behavior, so only new or changed layers need to move. You get the same incremental upload/pull pattern you would get with a registry, without first pushing those layers to Docker Hub or some other remote registry.
+For a lot of small setups, the developer machine is already the fastest and cheapest build machine available.
 
-## What It Does
+That leaves one awkward step: getting the image onto the remote host.
 
-One `ship` run does this:
+- `docker save` and `docker load` work, but they turn the transfer into a tarball workflow instead of a registry-style pull.
+- A remote registry works too, but it adds setup, cost, and an extra hop: local machine -> registry -> remote host.
+- Hosted build agents can be slower, more expensive, or both, especially when the image already exists locally.
 
-1. verifies each local image exists
-2. tags each image as `localhost:5001/<image>`
-3. starts a local registry on port `5001`
-4. pushes the transfer tags into that registry
-5. opens an SSH reverse tunnel to the remote host
-6. pulls the transfer tags on the remote host
-7. restores the original image tags on the remote host
+`ship` takes a narrower path:
 
-That is it.
+- use the image that already exists locally
+- expose a temporary local registry on your machine
+- tunnel that registry to the remote host over SSH
+- pull the image on the remote host and restore the original tag
 
-`ship` does not:
+## What `ship` does
 
-- build images
-- read Docker Compose files
+One `ship` run has one job: make sure one or more existing local Docker images end up on one remote host under their original tags.
+
+The current workflow is:
+
+1. tag each local image as `localhost:5001/<image>`
+2. ensure a local `registry:2` container is running on port `5001`
+3. push the transfer tags to that local registry
+4. open an SSH reverse tunnel to the remote host
+5. run remote `docker pull` and `docker tag` commands to restore the original image refs
+
+Before any of that starts, `ship` checks:
+
+- Docker is available locally
+- `ssh` is available locally
+- the SSH key exists if `-i` was provided
+- each requested local image exists
+- SSH connectivity to the target works
+
+## What `ship` does not do
+
+`ship` is intentionally narrow. It does not:
+
+- build Docker images
+- parse Docker Compose files
 - copy source code
-- run deploy hooks or remote commands
+- run arbitrary remote commands
+- restart containers after the transfer
 
-If you want to restart containers after the transfer, do that separately.
-
-## Usage
-
-```bash
-ship [-i key] [-p port] user@host image[:tag] [image[:tag]...]
-```
-
-Examples:
-
-```bash
-ship root@10.0.0.1 app:latest
-ship root@46.101.213.82 ship-test-api:latest traefik:v3
-ship -i ~/.ssh/id_ed25519 deploy@staging.example.com app:latest
-ship -i ~/.ssh/id_ed25519 -p 2222 deploy@staging.example.com ghcr.io/acme/app:dev redis:7
-```
+If you need deployment orchestration, do that separately.
 
 ## Requirements
 
 Local machine:
 
-- Docker
-- `ssh`
+- Docker installed and responsive
+- `ssh` installed
 - the image or images already present locally
+- port `5001` available for the local registry
 
 Remote host:
 
-- SSH access
+- reachable over SSH
 - Docker installed and running
-- port `5001` available for the reverse tunnel
+- port `5001` available for the reverse tunnel endpoint
 
-`-i` is optional. If omitted, `ship` uses the same default SSH identity behavior as `ssh`.
-
-## Preflight Checks
-
-Before stage 1 starts, `ship` verifies:
-
-- Docker is available locally
-- `ssh` is available locally
-- the SSH key exists if `-i` was provided
-- each local image exists
-- SSH connectivity to the remote host works
-
-If preflight passes, progress is printed in a consistent `[N/5]` format.
+`-i` is optional. If you leave it out, `ship` falls back to normal SSH identity resolution.
 
 ## Install
 
-Homebrew:
+### Homebrew
 
 ```bash
 brew tap yarlson/tap
 brew install ship
 ```
 
-Direct download from GitHub Releases:
+### GitHub Releases
 
-1. Pick the archive that matches your machine:
-   - `ship_<version>_darwin_amd64.tar.gz`
-   - `ship_<version>_darwin_arm64.tar.gz`
-   - `ship_<version>_linux_amd64.tar.gz`
-   - `ship_<version>_linux_arm64.tar.gz`
+Download the archive that matches your machine from the project's releases page, unpack it, and place the `ship` binary on your `PATH`.
 
-2. Download, unpack, and install it:
+Example:
 
 ```bash
 VERSION=0.1.0
@@ -108,11 +97,57 @@ chmod +x ship
 sudo mv ship /usr/local/bin/ship
 ```
 
-3. Verify it:
+### Build from source
+
+Requires Go `1.25`.
+
+```bash
+go build -o ship .
+```
+
+## Usage
+
+```bash
+ship [-i key] [-p port] user@host image[:tag] [image[:tag]...]
+```
+
+Examples:
+
+```bash
+ship root@10.0.0.1 app:latest
+ship root@10.0.0.1 ship-test-api:latest traefik:v3
+ship -i ~/.ssh/id_ed25519 deploy@staging.example.com app:latest
+ship -i ~/.ssh/id_ed25519 -p 2222 deploy@staging.example.com ghcr.io/acme/app:dev redis:7
+```
+
+Help output:
 
 ```bash
 ship --help
 ```
+
+## Output
+
+Progress is printed in a fixed `[N/5]` format:
+
+```text
+[1/5] Tagging images for transfer...
+[1/5] Tag complete
+[2/5] Starting local registry...
+[2/5] Registry ready
+[3/5] Pushing images to local registry...
+[3/5] Push complete
+[4/5] Establishing tunnel to staging.example.com...
+[4/5] Tunnel established
+[5/5] Pulling and restoring images on remote host...
+[5/5] Pull and restore complete
+Ship complete
+  Host:     staging.example.com
+  Images:   app:latest, redis:7
+  Status:   Success
+```
+
+Errors are printed to stderr in `Error: ...` form and fail fast on the first problem.
 
 ## Development
 
@@ -128,7 +163,7 @@ Lint:
 golangci-lint run --fix ./...
 ```
 
-Test:
+Unit tests:
 
 ```bash
 go test -race -count=1 -v -timeout=120s ./...
@@ -143,9 +178,8 @@ go test -race -count=1 -v -timeout=120s -tags=integration ./...
 E2E tests:
 
 ```bash
-export SHIP_E2E_USER=root
+export SHIP_E2E_USER=deploy
 export SHIP_E2E_HOST=staging.example.com
-# Optional if SSH defaults are not enough:
 export SHIP_E2E_KEY=~/.ssh/id_ed25519
 go test -race -count=1 -v -timeout=120s -tags=e2e ./...
 ```
