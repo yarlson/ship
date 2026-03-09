@@ -20,5 +20,6 @@ func New(t *testing.T) context.Context {
 
 // Background returns a timeout-bounded context for setup outside an individual test.
 func Background() (context.Context, context.CancelFunc) {
+	// #nosec G118 -- The caller receives and must invoke the returned cancel function.
 	return context.WithTimeout(context.Background(), defaultTimeout)
 }
