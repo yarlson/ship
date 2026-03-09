@@ -4,11 +4,8 @@
 
 Ship is a Go CLI that transfers one or more existing local Docker images to a remote host over SSH.
 
-It does not build images.
-It does not read Docker Compose files.
-It does not run a deploy hook on the remote host.
-
 Its only job is to make sure images that exist locally end up on the remote host under the same original tags.
+The build and deployment steps around that transfer are outside the tool's scope.
 
 ## CLI Shape
 

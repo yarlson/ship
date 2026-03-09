@@ -43,4 +43,4 @@ Every stage follows the same structure:
 
 - run remote `docker pull` for each transfer tag
 - run remote `docker tag` to restore each original image ref
-- do not execute arbitrary user-supplied shell commands
+- keep remote execution limited to the transfer steps the workflow owns

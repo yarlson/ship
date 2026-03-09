@@ -43,17 +43,11 @@ Before any of that starts, `ship` checks:
 - each requested local image exists
 - SSH connectivity to the target works
 
-## What `ship` does not do
+## Scope
 
-`ship` is intentionally narrow. It does not:
+`ship` is intentionally narrow. It focuses on transferring existing local Docker images to a remote host and restoring their original tags there.
 
-- build Docker images
-- parse Docker Compose files
-- copy source code
-- run arbitrary remote commands
-- restart containers after the transfer
-
-If you need deployment orchestration, do that separately.
+The build workflow before that transfer, and the deployment workflow after it, stay outside `ship`.
 
 ## Requirements
 

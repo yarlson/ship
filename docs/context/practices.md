@@ -4,8 +4,8 @@
 
 - Ship is an image transfer tool, not a deployment orchestrator.
 - Keep the scope at one or more local images to one remote host.
-- Do not add Docker Compose parsing or build orchestration back into the core path.
-- Do not add arbitrary remote command execution as part of the transfer workflow.
+- Keep build concerns and post-transfer deployment concerns outside the core path.
+- Keep remote operations limited to what the transfer workflow requires.
 
 ## Code Conventions
 

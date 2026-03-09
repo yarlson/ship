@@ -45,8 +45,5 @@ Used by Stage 1 to create the local-registry transfer tag.
 
 ## Deliberate Non-Goals
 
-This module does not:
-
-- parse Docker Compose config
-- build Docker images
-- discover images automatically
+This module does not decide what images should exist or where they come from.
+It only works with image references that were already provided to the transfer workflow.

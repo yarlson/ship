@@ -11,13 +11,11 @@ The `ssh` module owns:
 
 ## Remote Commands
 
-Ship still uses remote SSH commands internally, but only for the transfer path:
+Ship uses remote SSH commands internally only for the transfer path:
 
 - `docker pull <transfer>`
 - `docker tag <transfer> <original>`
 - preflight `true` connectivity check
-
-There is no user-facing arbitrary remote command stage anymore.
 
 ## Tunnel Shape
 
