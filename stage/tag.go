@@ -10,6 +10,10 @@ import (
 
 // Tag executes Stage 1: re-tag the local image with a localhost:5001/ prefix for transfer.
 func Tag(ctx context.Context, originals, transfers []string) error {
+	if err := validateImageLists(originals, transfers); err != nil {
+		return err
+	}
+
 	progress.StageStart(1, progressMessage(len(originals), "Tagging image", "Tagging images")+" for transfer")
 
 	for i, original := range originals {

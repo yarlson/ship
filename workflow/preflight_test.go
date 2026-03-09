@@ -1,6 +1,8 @@
 package workflow
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -89,4 +91,25 @@ func TestPreflight_ErrorFormat_NoHedging(t *testing.T) {
 	assert.NotContains(t, msg, "might")
 	assert.NotContains(t, msg, "possibly")
 	assert.NotContains(t, msg, "try to")
+}
+
+func TestPreflightCommandError_PreservesContextCanceled(t *testing.T) {
+	err := preflightCommandError(context.Canceled, "docker is not installed or not in PATH")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestPreflightCommandError_PreservesDeadlineExceeded(t *testing.T) {
+	err := preflightCommandError(context.DeadlineExceeded, "SSH connection failed — verify the target and SSH credentials")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestPreflightCommandError_UsesFallbackForOtherFailures(t *testing.T) {
+	err := preflightCommandError(errors.New("boom"), "docker is not installed or not in PATH")
+
+	require.Error(t, err)
+	assert.EqualError(t, err, "docker is not installed or not in PATH")
 }

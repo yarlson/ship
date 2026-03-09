@@ -43,7 +43,7 @@ func checkDocker(ctx context.Context) error {
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	if err := cmd.Run(); err != nil {
-		return errors.New("docker is not installed or not in PATH")
+		return preflightCommandError(err, "docker is not installed or not in PATH")
 	}
 	return nil
 }
@@ -94,7 +94,18 @@ func checkSSHConnectivity(ctx context.Context, cfg cli.Config) error {
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("SSH connection failed — verify the target and SSH credentials")
+		return preflightCommandError(err, "SSH connection failed — verify the target and SSH credentials")
 	}
 	return nil
+}
+
+func preflightCommandError(err error, fallback string) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+
+	return errors.New(fallback)
 }

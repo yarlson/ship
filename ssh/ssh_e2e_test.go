@@ -3,6 +3,7 @@
 package ssh
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,26 +16,28 @@ import (
 func TestRunRemoteCommand_Success(t *testing.T) {
 	cfg := testenv.RequireE2EConfig(t)
 
-	stdout, _, exitCode, err := RunRemoteCommand(testctx.New(t), cfg.KeyPath, 22, cfg.User, cfg.Host, "echo hello")
+	result, err := RunRemoteCommand(testctx.New(t), cfg.KeyPath, 22, cfg.User, cfg.Host, "echo hello")
 	require.NoError(t, err)
-	assert.Equal(t, 0, exitCode)
-	assert.Equal(t, "hello\n", stdout)
+	assert.Equal(t, "hello\n", result.Stdout)
 }
 
 func TestRunRemoteCommand_NonZeroExit(t *testing.T) {
 	cfg := testenv.RequireE2EConfig(t)
 
-	_, _, exitCode, err := RunRemoteCommand(testctx.New(t), cfg.KeyPath, 22, cfg.User, cfg.Host, "exit 42")
+	_, err := RunRemoteCommand(testctx.New(t), cfg.KeyPath, 22, cfg.User, cfg.Host, "exit 42")
 	require.Error(t, err)
-	assert.Equal(t, 42, exitCode)
+
+	var remoteErr *RemoteCommandError
+	require.True(t, errors.As(err, &remoteErr))
+	assert.Equal(t, 42, remoteErr.ExitCode)
 }
 
 func TestRunRemoteCommand_StderrCapture(t *testing.T) {
 	cfg := testenv.RequireE2EConfig(t)
 
-	_, stderr, _, err := RunRemoteCommand(testctx.New(t), cfg.KeyPath, 22, cfg.User, cfg.Host, "echo err >&2")
+	result, err := RunRemoteCommand(testctx.New(t), cfg.KeyPath, 22, cfg.User, cfg.Host, "echo err >&2")
 	require.NoError(t, err)
-	assert.Equal(t, "err\n", stderr)
+	assert.Equal(t, "err\n", result.Stderr)
 }
 
 func TestStartTunnel_ProcessAlive(t *testing.T) {

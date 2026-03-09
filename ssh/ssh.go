@@ -12,6 +12,21 @@ import (
 	"time"
 )
 
+// RemoteCommandResult is the captured output from one SSH remote command.
+type RemoteCommandResult struct {
+	Stdout string
+	Stderr string
+}
+
+// RemoteCommandError reports a non-zero exit from a remote command.
+type RemoteCommandError struct {
+	ExitCode int
+}
+
+func (e *RemoteCommandError) Error() string {
+	return fmt.Sprintf("remote command exited with code %d", e.ExitCode)
+}
+
 // BuildRemoteCommandArgs returns the argument slice for an SSH remote command execution.
 func BuildRemoteCommandArgs(keyPath string, port int, user, host, cmd string) []string {
 	args := commonArgs(keyPath, port)
@@ -52,8 +67,7 @@ func commonArgs(keyPath string, port int) []string {
 }
 
 // RunRemoteCommand executes a command on the remote host via SSH.
-// Returns stdout, stderr, exit code, and error.
-func RunRemoteCommand(ctx context.Context, keyPath string, port int, user, host, cmd string) (stdoutStr, stderrStr string, exitCode int, err error) {
+func RunRemoteCommand(ctx context.Context, keyPath string, port int, user, host, cmd string) (RemoteCommandResult, error) {
 	args := BuildRemoteCommandArgs(keyPath, port, user, host, cmd)
 	c := exec.CommandContext(ctx, "ssh", args...)
 
@@ -61,22 +75,32 @@ func RunRemoteCommand(ctx context.Context, keyPath string, port int, user, host,
 	c.Stdout = &stdoutBuf
 	c.Stderr = &stderrBuf
 
-	err = c.Run()
+	err := c.Run()
+	result := RemoteCommandResult{
+		Stdout: stdoutBuf.String(),
+		Stderr: stderrBuf.String(),
+	}
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return result, err
+		}
+
 		exitErr := &exec.ExitError{}
 		if errors.As(err, &exitErr) {
-			return stdoutBuf.String(), stderrBuf.String(), exitErr.ExitCode(), fmt.Errorf("remote command exited with code %d", exitErr.ExitCode())
+			return result, &RemoteCommandError{ExitCode: exitErr.ExitCode()}
 		}
-		return "", "", -1, fmt.Errorf("ssh command failed: %w", err)
+		return RemoteCommandResult{}, fmt.Errorf("ssh command failed: %w", err)
 	}
 
-	return stdoutBuf.String(), stderrBuf.String(), 0, nil
+	return result, nil
 }
 
 // TunnelProcess wraps an SSH tunnel background process with lifecycle management.
 type TunnelProcess struct {
-	cmd  *exec.Cmd
-	done chan struct{} // closed when cmd.Wait() returns
+	cmd    *exec.Cmd
+	done   chan struct{} // closed when cmd.Wait() returns
+	signal func(os.Signal) error
+	kill   func() error
 }
 
 // Exited returns a channel that is closed when the tunnel process exits.
@@ -95,8 +119,10 @@ func StartTunnel(ctx context.Context, keyPath string, port int, user, host strin
 	}
 
 	tp := &TunnelProcess{
-		cmd:  c,
-		done: make(chan struct{}),
+		cmd:    c,
+		done:   make(chan struct{}),
+		signal: c.Process.Signal,
+		kill:   c.Process.Kill,
 	}
 	go func() {
 		c.Wait() //nolint:errcheck // exit status handled via Exited channel
@@ -124,12 +150,12 @@ func StopTunnel(ctx context.Context, tp *TunnelProcess) error {
 	}
 
 	// Send SIGTERM.
-	if err := tp.cmd.Process.Signal(syscall.SIGTERM); err != nil {
+	if err := tp.signalProcess(syscall.SIGTERM); err != nil {
 		// Process already exited.
 		if errors.Is(err, os.ErrProcessDone) {
 			return nil
 		}
-		return nil
+		return fmt.Errorf("failed to stop SSH tunnel: %w", err)
 	}
 
 	timer := time.NewTimer(5 * time.Second)
@@ -142,7 +168,9 @@ func StopTunnel(ctx context.Context, tp *TunnelProcess) error {
 		return ctx.Err()
 	case <-timer.C:
 		// Force kill.
-		_ = tp.cmd.Process.Kill() //nolint:errcheck // best-effort
+		if err := tp.killProcess(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+			return fmt.Errorf("failed to force-stop SSH tunnel: %w", err)
+		}
 		select {
 		case <-tp.done:
 			return nil
@@ -150,4 +178,20 @@ func StopTunnel(ctx context.Context, tp *TunnelProcess) error {
 			return ctx.Err()
 		}
 	}
+}
+
+func (t *TunnelProcess) signalProcess(sig os.Signal) error {
+	if t.signal != nil {
+		return t.signal(sig)
+	}
+
+	return t.cmd.Process.Signal(sig)
+}
+
+func (t *TunnelProcess) killProcess() error {
+	if t.kill != nil {
+		return t.kill()
+	}
+
+	return t.cmd.Process.Kill()
 }

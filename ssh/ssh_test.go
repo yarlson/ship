@@ -1,6 +1,10 @@
 package ssh
 
 import (
+	"context"
+	"errors"
+	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,4 +65,27 @@ func TestNoKeyContentsInArgs(t *testing.T) {
 		assert.NotContains(t, arg, "PRIVATE")
 		assert.NotContains(t, arg, "KEY")
 	}
+}
+
+func TestRemoteCommandError_Error(t *testing.T) {
+	err := &RemoteCommandError{ExitCode: 42}
+
+	assert.EqualError(t, err, "remote command exited with code 42")
+}
+
+func TestStopTunnel_PropagatesSignalError(t *testing.T) {
+	expected := errors.New("signal failed")
+	tp := &TunnelProcess{
+		cmd:  &exec.Cmd{Process: &os.Process{}},
+		done: make(chan struct{}),
+		signal: func(os.Signal) error {
+			return expected
+		},
+	}
+
+	err := StopTunnel(context.Background(), tp)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, expected)
+	assert.Contains(t, err.Error(), "failed to stop SSH tunnel")
 }
