@@ -1,4 +1,4 @@
-Ship is a Go CLI tool that builds Docker Compose images locally, transfers them to a remote host via SSH tunnel and local registry, and runs a deployment command — all in one invocation.
+Ship is a Go CLI that transfers one or more existing local Docker images to a remote host over SSH.
 
 ## Commands
 
