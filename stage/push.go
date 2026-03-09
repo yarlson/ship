@@ -1,6 +1,7 @@
 package stage
 
 import (
+	"context"
 	"fmt"
 
 	"ship/docker"
@@ -8,11 +9,11 @@ import (
 )
 
 // Push executes Stage 3: push the transfer-tagged image to the local registry.
-func Push(transfers []string) error {
+func Push(ctx context.Context, transfers []string) error {
 	progress.StageStart(3, progressMessage(len(transfers), "Pushing image", "Pushing images")+" to local registry")
 
 	for _, transfer := range transfers {
-		if err := docker.PushImage(transfer); err != nil {
+		if err := docker.PushImage(ctx, transfer); err != nil {
 			return fmt.Errorf("failed to push %s — %w", transfer, err)
 		}
 	}

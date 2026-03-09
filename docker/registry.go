@@ -16,8 +16,8 @@ func ParseRegistryContainerFilter(output string) bool {
 }
 
 // CheckRegistryRunning checks if a registry:2 container is running with port 5001 mapped.
-func CheckRegistryRunning() (bool, error) {
-	cmd := exec.CommandContext(context.Background(), "docker", "ps", "--filter", "ancestor=registry:2", "--filter", "publish=5001", "--format", "{{.ID}}")
+func CheckRegistryRunning(ctx context.Context) (bool, error) {
+	cmd := exec.CommandContext(ctx, "docker", "ps", "--filter", "ancestor=registry:2", "--filter", "publish=5001", "--format", "{{.ID}}")
 	out, err := cmd.Output()
 	if err != nil {
 		return false, fmt.Errorf("docker ps: %w", err)
@@ -27,9 +27,9 @@ func CheckRegistryRunning() (bool, error) {
 
 // CheckPortConflict detects if port 5001 is occupied by any running container (non-registry).
 // Should only be called after CheckRegistryRunning returns false.
-func CheckPortConflict() (bool, error) {
+func CheckPortConflict(ctx context.Context) (bool, error) {
 	// Check if any container is using port 5001.
-	cmd := exec.CommandContext(context.Background(), "docker", "ps", "--filter", "publish=5001", "--format", "{{.ID}}")
+	cmd := exec.CommandContext(ctx, "docker", "ps", "--filter", "publish=5001", "--format", "{{.ID}}")
 	out, err := cmd.Output()
 	if err != nil {
 		return false, fmt.Errorf("docker ps: %w", err)
@@ -40,7 +40,7 @@ func CheckPortConflict() (bool, error) {
 
 	// Also check non-Docker processes via TCP dial.
 	dialer := &net.Dialer{Timeout: 1 * time.Second}
-	conn, dialErr := dialer.DialContext(context.Background(), "tcp", "localhost:5001")
+	conn, dialErr := dialer.DialContext(ctx, "tcp", "localhost:5001")
 	if dialErr != nil {
 		return false, nil //nolint:nilerr // connection refused means port is free, not an error
 	}
@@ -49,29 +49,36 @@ func CheckPortConflict() (bool, error) {
 }
 
 // StartRegistry starts a registry:2 container on port 5001 and waits for it to accept connections.
-func StartRegistry() error {
-	cmd := exec.CommandContext(context.Background(), "docker", "run", "-d", "-p", "5001:5000", "registry:2")
+func StartRegistry(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, "docker", "run", "-d", "-p", "5001:5000", "registry:2")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("docker run registry: %s", strings.TrimSpace(string(out)))
 	}
 
 	// Wait for the registry to be ready to accept connections.
 	dialer := &net.Dialer{Timeout: 500 * time.Millisecond}
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
 	for range 30 {
-		conn, err := dialer.DialContext(context.Background(), "tcp", "localhost:5001")
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		conn, err := dialer.DialContext(ctx, "tcp", "localhost:5001")
 		if err == nil {
 			conn.Close()
 			return nil
 		}
-		time.Sleep(100 * time.Millisecond)
+		<-ticker.C
 	}
 
 	return fmt.Errorf("registry started but not accepting connections on port 5001")
 }
 
 // PushImage runs docker push for the given image reference.
-func PushImage(imageRef string) error {
-	cmd := exec.CommandContext(context.Background(), "docker", "push", imageRef)
+func PushImage(ctx context.Context, imageRef string) error {
+	cmd := exec.CommandContext(ctx, "docker", "push", imageRef)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("docker push: %s", strings.TrimSpace(string(out)))
 	}

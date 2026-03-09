@@ -1,7 +1,6 @@
 package main_test
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,31 +10,38 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"ship/testctx"
 )
 
 var binaryPath string
 
 func TestMain(m *testing.M) {
+	ctx, cancel := testctx.Background()
+
 	tmpDir, err := os.MkdirTemp("", "ship-cli")
 	if err != nil {
+		cancel()
 		fmt.Fprintf(os.Stderr, "failed to create temp dir: %s\n", err)
 		os.Exit(1)
 	}
 
 	binaryPath = filepath.Join(tmpDir, "ship")
-	cmd := exec.CommandContext(context.Background(), "go", "build", "-o", binaryPath, ".")
+	cmd := exec.CommandContext(ctx, "go", "build", "-o", binaryPath, ".")
 	if out, err := cmd.CombinedOutput(); err != nil {
+		cancel()
 		fmt.Fprintf(os.Stderr, "build failed: %s\n%s", err, out)
 		os.Exit(1)
 	}
 
 	code := m.Run()
+	cancel()
 	os.RemoveAll(tmpDir)
 	os.Exit(code)
 }
 
 func TestShip_Help_PrintsUsage(t *testing.T) {
-	cmd := exec.CommandContext(context.Background(), binaryPath, "--help")
+	cmd := exec.CommandContext(testctx.New(t), binaryPath, "--help")
 	out, err := cmd.Output()
 	require.NoError(t, err)
 
@@ -47,7 +53,7 @@ func TestShip_Help_PrintsUsage(t *testing.T) {
 }
 
 func TestShip_NoArgs_PrintsMissingArgumentsError(t *testing.T) {
-	cmd := exec.CommandContext(context.Background(), binaryPath)
+	cmd := exec.CommandContext(testctx.New(t), binaryPath)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	err := cmd.Run()
@@ -61,7 +67,7 @@ func TestShip_NoArgs_PrintsMissingArgumentsError(t *testing.T) {
 }
 
 func TestShip_OnlyTarget_PrintsMissingImageError(t *testing.T) {
-	cmd := exec.CommandContext(context.Background(), binaryPath, "deploy@example.com")
+	cmd := exec.CommandContext(testctx.New(t), binaryPath, "deploy@example.com")
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	err := cmd.Run()

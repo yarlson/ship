@@ -4,7 +4,6 @@ package stage
 
 import (
 	"bytes"
-	"context"
 	"os/exec"
 	"testing"
 
@@ -12,6 +11,7 @@ import (
 
 	"ship/docker"
 	"ship/progress"
+	"ship/testctx"
 )
 
 func captureOutput(fn func()) string {
@@ -25,7 +25,7 @@ func captureOutput(fn func()) string {
 
 func requireDocker(t *testing.T) {
 	t.Helper()
-	cmd := exec.CommandContext(context.Background(), "docker", "version")
+	cmd := exec.CommandContext(testctx.New(t), "docker", "version")
 	if err := cmd.Run(); err != nil {
 		t.Skipf("skipping integration test: Docker daemon unavailable: %v", err)
 	}
@@ -34,11 +34,12 @@ func requireDocker(t *testing.T) {
 func ensureLocalImage(t *testing.T, imageRef string) {
 	t.Helper()
 	requireDocker(t)
+	ctx := testctx.New(t)
 
-	pull := exec.CommandContext(context.Background(), "docker", "pull", "alpine:latest")
+	pull := exec.CommandContext(ctx, "docker", "pull", "alpine:latest")
 	if out, err := pull.CombinedOutput(); err != nil {
 		t.Fatalf("failed to pull alpine: %v\n%s", err, string(out))
 	}
 
-	require.NoError(t, docker.TagImage("alpine:latest", imageRef))
+	require.NoError(t, docker.TagImage(ctx, "alpine:latest", imageRef))
 }

@@ -15,8 +15,8 @@ import (
 
 // Preflight runs all preflight checks in sequence before the stage pipeline.
 // Returns on first failure with a formatted error.
-func Preflight(cfg cli.Config) error {
-	if err := checkDocker(); err != nil {
+func Preflight(ctx context.Context, cfg cli.Config) error {
+	if err := checkDocker(ctx); err != nil {
 		return err
 	}
 	if err := checkSSH(); err != nil {
@@ -25,21 +25,21 @@ func Preflight(cfg cli.Config) error {
 	if err := checkKeyFile(cfg.KeyPath); err != nil {
 		return err
 	}
-	if err := checkLocalImages(cfg.Images); err != nil {
+	if err := checkLocalImages(ctx, cfg.Images); err != nil {
 		return err
 	}
-	if err := checkSSHConnectivity(cfg); err != nil {
+	if err := checkSSHConnectivity(ctx, cfg); err != nil {
 		return err
 	}
 	return nil
 }
 
 // checkDocker verifies docker is on PATH and responds.
-func checkDocker() error {
+func checkDocker(ctx context.Context) error {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return errors.New("docker is not installed or not in PATH")
 	}
-	cmd := exec.CommandContext(context.Background(), "docker", "version")
+	cmd := exec.CommandContext(ctx, "docker", "version")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	if err := cmd.Run(); err != nil {
@@ -77,9 +77,9 @@ func checkKeyFile(keyPath string) error {
 	return nil
 }
 
-func checkLocalImages(imageRefs []string) error {
+func checkLocalImages(ctx context.Context, imageRefs []string) error {
 	for _, imageRef := range imageRefs {
-		if err := docker.ImageExists(imageRef); err != nil {
+		if err := docker.ImageExists(ctx, imageRef); err != nil {
 			return err
 		}
 	}
@@ -88,9 +88,9 @@ func checkLocalImages(imageRefs []string) error {
 }
 
 // checkSSHConnectivity tests SSH connectivity to the remote host.
-func checkSSHConnectivity(cfg cli.Config) error {
+func checkSSHConnectivity(ctx context.Context, cfg cli.Config) error {
 	args := shipssh.BuildRemoteCommandArgs(cfg.KeyPath, cfg.Port, cfg.User, cfg.Host, "true")
-	cmd := exec.CommandContext(context.Background(), "ssh", args...)
+	cmd := exec.CommandContext(ctx, "ssh", args...)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	if err := cmd.Run(); err != nil {

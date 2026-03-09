@@ -4,7 +4,6 @@ package workflow
 
 import (
 	"bytes"
-	"context"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"ship/cli"
 	"ship/docker"
 	"ship/progress"
+	"ship/testctx"
 	"ship/testenv"
 	"ship/testlock"
 )
@@ -37,18 +37,19 @@ func testSSHConfig(t *testing.T) (keyPath, user, host string) {
 
 func setupLocalImage(t *testing.T, imageRef string) {
 	t.Helper()
+	ctx := testctx.New(t)
 
-	version := exec.CommandContext(context.Background(), "docker", "version")
+	version := exec.CommandContext(ctx, "docker", "version")
 	if err := version.Run(); err != nil {
 		t.Skipf("skipping e2e test: Docker daemon unavailable: %v", err)
 	}
 
-	pull := exec.CommandContext(context.Background(), "docker", "pull", "alpine:latest")
+	pull := exec.CommandContext(ctx, "docker", "pull", "alpine:latest")
 	if out, err := pull.CombinedOutput(); err != nil {
 		t.Skipf("skipping e2e test: failed to pull alpine: %v\n%s", err, string(out))
 	}
 
-	require.NoError(t, docker.TagImage("alpine:latest", imageRef))
+	require.NoError(t, docker.TagImage(ctx, "alpine:latest", imageRef))
 }
 
 func TestPreflight_PassesWithValidConfig(t *testing.T) {
@@ -65,7 +66,7 @@ func TestPreflight_PassesWithValidConfig(t *testing.T) {
 		Port:    22,
 	}
 
-	err := Preflight(cfg)
+	err := Preflight(testctx.New(t), cfg)
 	assert.NoError(t, err)
 }
 
@@ -87,7 +88,7 @@ func TestRun_PrintsAllFiveStages(t *testing.T) {
 	}
 
 	out := captureOutput(func() {
-		err := Run(cfg)
+		err := Run(testctx.New(t), cfg)
 		require.NoError(t, err)
 	})
 
@@ -115,7 +116,7 @@ func TestRun_StagesInOrder(t *testing.T) {
 	}
 
 	out := captureOutput(func() {
-		err := Run(cfg)
+		err := Run(testctx.New(t), cfg)
 		require.NoError(t, err)
 	})
 
@@ -155,7 +156,7 @@ func TestWorkflow_Summary(t *testing.T) {
 	}
 
 	out := captureOutput(func() {
-		err := Run(cfg)
+		err := Run(testctx.New(t), cfg)
 		require.NoError(t, err)
 	})
 
@@ -183,10 +184,10 @@ func TestWorkflow_TunnelCleanedUpOnSuccess(t *testing.T) {
 		Port:    22,
 	}
 
-	err := Run(cfg)
+	err := Run(testctx.New(t), cfg)
 	require.NoError(t, err)
 
-	out, cmdErr := exec.CommandContext(context.Background(), "bash", "-c", "ps aux | grep '[s]sh.*-R 5001' | grep -v grep || true").Output()
+	out, cmdErr := exec.CommandContext(testctx.New(t), "bash", "-c", "ps aux | grep '[s]sh.*-R 5001' | grep -v grep || true").Output()
 	require.NoError(t, cmdErr)
 	assert.Empty(t, strings.TrimSpace(string(out)), "tunnel process should be cleaned up after success")
 }

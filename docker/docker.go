@@ -23,8 +23,8 @@ func TransferTags(imageRefs []string) []string {
 }
 
 // ImageExists verifies that a local image reference exists.
-func ImageExists(imageRef string) error {
-	cmd := exec.CommandContext(context.Background(), "docker", "image", "inspect", imageRef)
+func ImageExists(ctx context.Context, imageRef string) error {
+	cmd := exec.CommandContext(ctx, "docker", "image", "inspect", imageRef)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		msg := strings.TrimSpace(string(out))
 		if strings.Contains(msg, "No such object") || strings.Contains(msg, "No such image") {
@@ -40,8 +40,8 @@ func ImageExists(imageRef string) error {
 }
 
 // TagImage runs docker tag to create a new tag for an image.
-func TagImage(source, target string) error {
-	cmd := exec.CommandContext(context.Background(), "docker", "tag", source, target)
+func TagImage(ctx context.Context, source, target string) error {
+	cmd := exec.CommandContext(ctx, "docker", "tag", source, target)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("docker tag %s → %s: %s", source, target, strings.TrimSpace(string(out)))
 	}

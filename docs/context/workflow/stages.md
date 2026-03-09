@@ -8,7 +8,7 @@ The workflow runs 5 stages after preflight succeeds.
 
 - input: original image refs
 - action: create `localhost:5001/<image>` transfer tags
-- implementation: `stage.Tag(originals, transfers)`
+- implementation: `stage.Tag(ctx, originals, transfers)`
 
 ## Stage 2: Registry
 
@@ -16,7 +16,7 @@ The workflow runs 5 stages after preflight succeeds.
 
 - input: none
 - action: reuse or start a local `registry:2` container bound to port `5001`
-- implementation: `stage.Registry()`
+- implementation: `stage.Registry(ctx)`
 
 ## Stage 3: Push
 
@@ -24,7 +24,7 @@ The workflow runs 5 stages after preflight succeeds.
 
 - input: transfer tags
 - action: push the transfer tags into the local registry
-- implementation: `stage.Push(transfers)`
+- implementation: `stage.Push(ctx, transfers)`
 
 ## Stage 4: Tunnel
 
@@ -32,7 +32,7 @@ The workflow runs 5 stages after preflight succeeds.
 
 - input: SSH config
 - action: open reverse SSH tunnel `5001:localhost:5001`
-- implementation: `stage.Tunnel(cfg)`
+- implementation: `stage.Tunnel(ctx, cfg)`
 
 ## Stage 5: Pull And Restore
 
@@ -42,8 +42,8 @@ The workflow runs 5 stages after preflight succeeds.
 - action:
   - run remote `docker pull <transfer>` for each image
   - run remote `docker tag <transfer> <original>` for each image
-- implementation: `stage.Pull(cfg, originals, transfers)`
+- implementation: `stage.Pull(ctx, cfg, originals, transfers)`
 
 ## Cleanup
 
-The workflow owns tunnel cleanup. After Stage 4 succeeds, `workflow.Run()` defers `ssh.StopTunnel()` so the tunnel is closed on success and on failure.
+The workflow owns tunnel cleanup. After Stage 4 succeeds, `workflow.Run(ctx, cfg)` defers `ssh.StopTunnel(cleanupCtx, tp)` so the tunnel is closed on success and on failure, even if the main workflow context was canceled.

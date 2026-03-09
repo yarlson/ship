@@ -14,7 +14,7 @@ app:latest -> localhost:5001/app:latest
 
 Converts multiple original image refs into transfer tags in the same order.
 
-### `ImageExists(imageRef string) error`
+### `ImageExists(ctx context.Context, imageRef string) error`
 
 Runs:
 
@@ -24,7 +24,7 @@ docker image inspect <imageRef>
 
 Used during preflight to verify each requested local image exists before any stage runs.
 
-### `TagImage(source, target string) error`
+### `TagImage(ctx context.Context, source, target string) error`
 
 Runs:
 
@@ -42,6 +42,8 @@ Used by Stage 1 to create the local-registry transfer tag.
 - detecting port conflicts
 - starting `registry:2`
 - pushing an image to the registry
+
+These helpers take a caller-owned `context.Context` because they shell out to Docker or wait on local sockets.
 
 ## Deliberate Non-Goals
 

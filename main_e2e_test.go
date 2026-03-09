@@ -3,7 +3,6 @@
 package main_test
 
 import (
-	"context"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -13,19 +12,21 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"ship/docker"
+	"ship/testctx"
 	"ship/testenv"
 	"ship/testlock"
 )
 
 func setupLocalImage(t *testing.T, imageRef string) {
 	t.Helper()
+	ctx := testctx.New(t)
 
-	pull := exec.CommandContext(context.Background(), "docker", "pull", "alpine:latest")
+	pull := exec.CommandContext(ctx, "docker", "pull", "alpine:latest")
 	if out, err := pull.CombinedOutput(); err != nil {
 		t.Fatalf("failed to pull alpine: %v\n%s", err, string(out))
 	}
 
-	require.NoError(t, docker.TagImage("alpine:latest", imageRef))
+	require.NoError(t, docker.TagImage(ctx, "alpine:latest", imageRef))
 }
 
 func TestShip_PrintsFiveStages(t *testing.T) {
@@ -45,7 +46,7 @@ func TestShip_PrintsFiveStages(t *testing.T) {
 	args = append(args, cfg.Address())
 	args = append(args, imageRefs...)
 
-	cmd := exec.CommandContext(context.Background(), binaryPath, args...)
+	cmd := exec.CommandContext(testctx.New(t), binaryPath, args...)
 	out, err := cmd.Output()
 	require.NoError(t, err)
 
@@ -80,7 +81,7 @@ func TestShip_BadKeyPath_FailsBeforeStages(t *testing.T) {
 	imageRef := "ship-main-bad-key:latest"
 	setupLocalImage(t, imageRef)
 
-	cmd := exec.CommandContext(context.Background(), binaryPath, "-i", "/tmp/nonexistent-key-ship-test", cfg.Address(), imageRef)
+	cmd := exec.CommandContext(testctx.New(t), binaryPath, "-i", "/tmp/nonexistent-key-ship-test", cfg.Address(), imageRef)
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -105,7 +106,7 @@ func TestShip_UnreachableHost_FailsBeforeStages(t *testing.T) {
 	}
 	args = append(args, "root@192.0.2.1", imageRef)
 
-	cmd := exec.CommandContext(context.Background(), binaryPath, args...)
+	cmd := exec.CommandContext(testctx.New(t), binaryPath, args...)
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -124,7 +125,7 @@ func TestShip_MissingLocalImage_FailsBeforeStages(t *testing.T) {
 	}
 	args = append(args, cfg.Address(), "ship-main-missing:latest")
 
-	cmd := exec.CommandContext(context.Background(), binaryPath, args...)
+	cmd := exec.CommandContext(testctx.New(t), binaryPath, args...)
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

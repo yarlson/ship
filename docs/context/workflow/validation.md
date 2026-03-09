@@ -2,7 +2,7 @@
 
 ## Preflight Checks
 
-`workflow.Preflight(cfg)` runs these checks in order:
+`workflow.Preflight(ctx, cfg)` runs these checks in order:
 
 1. Docker is installed and responsive
 2. `ssh` is installed
@@ -23,6 +23,7 @@ Representative messages:
 
 ## Notes
 
+- The caller owns `ctx`; preflight does not create its own root context.
 - Missing key path is allowed if the user relies on normal SSH identity resolution.
 - SSH connectivity is tested with a remote `true` command before any transfer stages run.
 - Preflight does not create Docker objects or open tunnels.

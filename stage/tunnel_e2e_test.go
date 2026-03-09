@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"ship/ssh"
+	"ship/testctx"
 )
 
 func TestTunnel_EstablishesAndStoresInState(t *testing.T) {
@@ -18,12 +19,15 @@ func TestTunnel_EstablishesAndStoresInState(t *testing.T) {
 
 	var tunnelCmd interface{}
 	out := captureOutput(func() {
-		cmd, err := Tunnel(cfg)
+		cmd, err := Tunnel(testctx.New(t), cfg)
 		require.NoError(t, err)
 		require.NotNil(t, cmd)
 		tunnelCmd = cmd
 		t.Cleanup(func() {
-			ssh.StopTunnel(cmd) //nolint:errcheck // best-effort cleanup in tests
+			ctx, cancel := testctx.Background()
+			defer cancel()
+
+			ssh.StopTunnel(ctx, cmd) //nolint:errcheck // best-effort cleanup in tests
 		})
 	})
 
@@ -41,7 +45,7 @@ func TestTunnel_FailsOnBadHost(t *testing.T) {
 
 	var err error
 	captureOutput(func() {
-		_, err = Tunnel(cfg)
+		_, err = Tunnel(testctx.New(t), cfg)
 	})
 
 	require.Error(t, err)

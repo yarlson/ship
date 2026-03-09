@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"ship/ssh"
+	"ship/testctx"
 	"ship/testlock"
 )
 
@@ -22,7 +23,7 @@ func TestPull_PullsAndRestoresImage(t *testing.T) {
 	transfers := []string{"localhost:5001/ship-pulltest:latest", "localhost:5001/ship-pulltest-proxy:v3"}
 
 	captureOutput(func() {
-		require.NoError(t, Registry())
+		require.NoError(t, Registry(testctx.New(t)))
 	})
 	for _, transfer := range transfers {
 		require.NoError(t, tagAndPushTestImage(t, "alpine:latest", transfer))
@@ -31,15 +32,18 @@ func TestPull_PullsAndRestoresImage(t *testing.T) {
 	var tp *ssh.TunnelProcess
 	captureOutput(func() {
 		var err error
-		tp, err = Tunnel(cfg)
+		tp, err = Tunnel(testctx.New(t), cfg)
 		require.NoError(t, err)
 	})
 	t.Cleanup(func() {
-		ssh.StopTunnel(tp) //nolint:errcheck // best-effort cleanup
+		ctx, cancel := testctx.Background()
+		defer cancel()
+
+		ssh.StopTunnel(ctx, tp) //nolint:errcheck // best-effort cleanup
 	})
 
 	out := captureOutput(func() {
-		err := Pull(cfg, originals, transfers)
+		err := Pull(testctx.New(t), cfg, originals, transfers)
 		require.NoError(t, err)
 	})
 
@@ -55,14 +59,17 @@ func TestPull_FailsWhenImageUnavailable(t *testing.T) {
 	var tp *ssh.TunnelProcess
 	captureOutput(func() {
 		var err error
-		tp, err = Tunnel(cfg)
+		tp, err = Tunnel(testctx.New(t), cfg)
 		require.NoError(t, err)
 	})
 	t.Cleanup(func() {
-		ssh.StopTunnel(tp) //nolint:errcheck // best-effort cleanup
+		ctx, cancel := testctx.Background()
+		defer cancel()
+
+		ssh.StopTunnel(ctx, tp) //nolint:errcheck // best-effort cleanup
 	})
 
-	err := Pull(cfg, []string{"nonexistent:latest"}, []string{"localhost:5001/nonexistent-image-that-does-not-exist:latest"})
+	err := Pull(testctx.New(t), cfg, []string{"nonexistent:latest"}, []string{"localhost:5001/nonexistent-image-that-does-not-exist:latest"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to pull image on remote host")
 }

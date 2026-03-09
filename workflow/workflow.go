@@ -1,8 +1,10 @@
 package workflow
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"ship/cli"
 	"ship/docker"
@@ -19,8 +21,8 @@ type State struct {
 }
 
 // Run executes preflight checks followed by the 5-stage workflow.
-func Run(cfg cli.Config) error {
-	if err := Preflight(cfg); err != nil {
+func Run(ctx context.Context, cfg cli.Config) error {
+	if err := Preflight(ctx, cfg); err != nil {
 		return err
 	}
 
@@ -29,26 +31,26 @@ func Run(cfg cli.Config) error {
 		TransferImages: docker.TransferTags(cfg.Images),
 	}
 
-	if err := stage.Tag(state.OriginalImages, state.TransferImages); err != nil {
+	if err := stage.Tag(ctx, state.OriginalImages, state.TransferImages); err != nil {
 		return wrapStageErr(1, "Tag", err)
 	}
 
-	if err := stage.Registry(); err != nil {
+	if err := stage.Registry(ctx); err != nil {
 		return wrapStageErr(2, "Registry", err)
 	}
 
-	if err := stage.Push(state.TransferImages); err != nil {
+	if err := stage.Push(ctx, state.TransferImages); err != nil {
 		return wrapStageErr(3, "Push", err)
 	}
 
-	tp, err := stage.Tunnel(cfg)
+	tp, err := stage.Tunnel(ctx, cfg)
 	if err != nil {
 		return wrapStageErr(4, "Tunnel", err)
 	}
 	state.TunnelCmd = tp
-	defer cleanupTunnel(state)
+	defer cleanupTunnel(ctx, state)
 
-	if err := stage.Pull(cfg, state.OriginalImages, state.TransferImages); err != nil {
+	if err := stage.Pull(ctx, cfg, state.OriginalImages, state.TransferImages); err != nil {
 		return wrapStageErr(5, "Pull", err)
 	}
 
@@ -74,11 +76,14 @@ func printSummary(cfg cli.Config, state *State) {
 }
 
 // cleanupTunnel stops the SSH tunnel process if it is running.
-func cleanupTunnel(state *State) {
+func cleanupTunnel(ctx context.Context, state *State) {
 	if state.TunnelCmd == nil {
 		return
 	}
-	if err := ssh.StopTunnel(state.TunnelCmd); err != nil {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+
+	if err := ssh.StopTunnel(cleanupCtx, state.TunnelCmd); err != nil {
 		fmt.Fprintf(progress.Writer, "Warning: tunnel cleanup failed: %s\n", err)
 	}
 }

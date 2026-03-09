@@ -2,18 +2,18 @@
 
 ## Stage Signatures
 
-- `Tag(originals, transfers []string) error`
-- `Registry() error`
-- `Push(transfers []string) error`
-- `Tunnel(cfg cli.Config) (*ssh.TunnelProcess, error)`
-- `Pull(cfg cli.Config, originals, transfers []string) error`
+- `Tag(ctx context.Context, originals, transfers []string) error`
+- `Registry(ctx context.Context) error`
+- `Push(ctx context.Context, transfers []string) error`
+- `Tunnel(ctx context.Context, cfg cli.Config) (*ssh.TunnelProcess, error)`
+- `Pull(ctx context.Context, cfg cli.Config, originals, transfers []string) error`
 
 ## Common Pattern
 
 Every stage follows the same structure:
 
 1. call `progress.StageStart()`
-2. perform the actual Docker or SSH work
+2. perform the actual Docker or SSH work using the caller-provided `ctx`
 3. return an error immediately on failure
 4. call `progress.StageComplete()` on success
 
@@ -21,7 +21,7 @@ Every stage follows the same structure:
 
 ### Tag
 
-- use `docker.TagImage(original, transfer)` for each image
+- use `docker.TagImage(ctx, original, transfer)` for each image
 - fail if any original image ref does not exist locally
 
 ### Registry

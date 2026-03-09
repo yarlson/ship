@@ -3,7 +3,6 @@
 package stage
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,12 +11,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"ship/testctx"
 	"ship/testlock"
 )
 
 func queryRegistryTags(t *testing.T, name string) []string {
 	t.Helper()
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("http://localhost:5001/v2/%s/tags/list", name), http.NoBody)
+	req, err := http.NewRequestWithContext(testctx.New(t), http.MethodGet, fmt.Sprintf("http://localhost:5001/v2/%s/tags/list", name), http.NoBody)
 	require.NoError(t, err)
 
 	resp, err := http.DefaultClient.Do(req)
@@ -43,15 +43,15 @@ func TestRegistryAndPush_HappyPath(t *testing.T) {
 	for _, original := range originals {
 		ensureLocalImage(t, original)
 	}
-	require.NoError(t, Tag(originals, transfers))
+	require.NoError(t, Tag(testctx.New(t), originals, transfers))
 
 	captureOutput(func() {
-		err := Registry()
+		err := Registry(testctx.New(t))
 		require.NoError(t, err)
 	})
 
 	out := captureOutput(func() {
-		err := Push(transfers)
+		err := Push(testctx.New(t), transfers)
 		require.NoError(t, err)
 	})
 
@@ -71,10 +71,10 @@ func TestPush_FailsOnBadImageRef(t *testing.T) {
 	t.Cleanup(func() { testlock.StopRegistry(t) })
 
 	captureOutput(func() {
-		require.NoError(t, Registry())
+		require.NoError(t, Registry(testctx.New(t)))
 	})
 
-	err := Push([]string{"localhost:5001/nonexistent:latest"})
+	err := Push(testctx.New(t), []string{"localhost:5001/nonexistent:latest"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "localhost:5001/nonexistent:latest")
 }

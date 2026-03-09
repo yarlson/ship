@@ -4,13 +4,13 @@ package stage
 
 import (
 	"bytes"
-	"context"
 	"os/exec"
 	"testing"
 
 	"ship/cli"
 	"ship/docker"
 	"ship/progress"
+	"ship/testctx"
 	"ship/testenv"
 )
 
@@ -37,17 +37,18 @@ func testSSHConfig(t *testing.T) cli.Config {
 // tagAndPushTestImage tags a source image with the given transfer tag and pushes it to the local registry.
 func tagAndPushTestImage(t *testing.T, source, transferTag string) error {
 	t.Helper()
+	ctx := testctx.New(t)
 
 	// Pull the source image if not present.
-	pull := exec.CommandContext(context.Background(), "docker", "pull", source)
+	pull := exec.CommandContext(ctx, "docker", "pull", source)
 	if out, err := pull.CombinedOutput(); err != nil {
 		t.Logf("pull output: %s", string(out))
 		return err
 	}
 
-	if err := docker.TagImage(source, transferTag); err != nil {
+	if err := docker.TagImage(ctx, source, transferTag); err != nil {
 		return err
 	}
 
-	return docker.PushImage(transferTag)
+	return docker.PushImage(ctx, transferTag)
 }

@@ -3,12 +3,13 @@
 package stage
 
 import (
-	"context"
 	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"ship/testctx"
 )
 
 func TestTag_CreatesTransferTag(t *testing.T) {
@@ -20,7 +21,7 @@ func TestTag_CreatesTransferTag(t *testing.T) {
 	}
 
 	out := captureOutput(func() {
-		err := Tag(originals, transfers)
+		err := Tag(testctx.New(t), originals, transfers)
 		require.NoError(t, err)
 	})
 
@@ -28,7 +29,7 @@ func TestTag_CreatesTransferTag(t *testing.T) {
 	assert.Contains(t, out, "[1/5] Tag complete")
 
 	for _, transfer := range transfers {
-		cmd := exec.CommandContext(context.Background(), "docker", "image", "inspect", transfer)
+		cmd := exec.CommandContext(testctx.New(t), "docker", "image", "inspect", transfer)
 		require.NoError(t, cmd.Run(), "transfer tag should exist: %s", transfer)
 	}
 }
@@ -36,7 +37,7 @@ func TestTag_CreatesTransferTag(t *testing.T) {
 func TestTag_FailsOnMissingSourceImage(t *testing.T) {
 	requireDocker(t)
 
-	err := Tag([]string{"ship-missing-image:latest"}, []string{"localhost:5001/ship-missing-image:latest"})
+	err := Tag(testctx.New(t), []string{"ship-missing-image:latest"}, []string{"localhost:5001/ship-missing-image:latest"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to tag ship-missing-image:latest")
 }

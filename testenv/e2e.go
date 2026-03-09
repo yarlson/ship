@@ -1,13 +1,14 @@
 package testenv
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
+
+	"ship/testctx"
 )
 
 // E2EConfig holds the SSH target used by end-to-end tests.
@@ -54,7 +55,7 @@ func RequireE2EConfig(t *testing.T) E2EConfig {
 		t.Skipf("skipping e2e test: %v", err)
 	}
 
-	dockerCmd := exec.CommandContext(context.Background(), "docker", "version")
+	dockerCmd := exec.CommandContext(testctx.New(t), "docker", "version")
 	if err := dockerCmd.Run(); err != nil {
 		t.Skipf("skipping e2e test: Docker daemon unavailable: %v", err)
 	}
@@ -77,7 +78,7 @@ func RequireE2EConfig(t *testing.T) E2EConfig {
 		cfg.Address(),
 		"true",
 	)
-	sshCmd := exec.CommandContext(context.Background(), "ssh", args...)
+	sshCmd := exec.CommandContext(testctx.New(t), "ssh", args...)
 	if err := sshCmd.Run(); err != nil {
 		t.Skipf("skipping e2e test: SSH test host unavailable: %v", err)
 	}

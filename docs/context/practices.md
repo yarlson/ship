@@ -10,6 +10,8 @@
 ## Code Conventions
 
 - Use the standard library `flag` package for CLI parsing.
+- Own the root `context.Context` at the CLI or workflow boundary and pass it into blocking operations.
+- Keep pure helpers context-free; only functions that can block on process, network, or time should take `context.Context`.
 - Shell out to `docker` and `ssh`, not Go SDKs.
 - Prefer direct error messages with one clear remediation hint.
 - Keep stage functions narrow and explicit.
@@ -20,6 +22,7 @@
 - Print `progress.StageStart()` before doing the stage work.
 - Print `progress.StageComplete()` only after the stage succeeds.
 - Keep tunnel cleanup in `workflow`, not inside the stage call sites.
+- Cleanup may use a bounded context that outlives cancellation of the main workflow context.
 
 ## Testing Conventions
 

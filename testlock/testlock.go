@@ -3,7 +3,6 @@
 package testlock
 
 import (
-	"context"
 	"net"
 	"os"
 	"os/exec"
@@ -11,6 +10,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"ship/testctx"
 )
 
 // Port5001 acquires an exclusive file lock to serialize access to port 5001
@@ -38,7 +39,9 @@ func Port5001(t *testing.T) {
 // StopRegistry stops any running registry:2 containers on port 5001 and waits for port release.
 func StopRegistry(t *testing.T) {
 	t.Helper()
-	cmd := exec.CommandContext(context.Background(), "docker", "ps", "-q", "--filter", "ancestor=registry:2", "--filter", "publish=5001")
+	ctx, cancel := testctx.Background()
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", "ps", "-q", "--filter", "ancestor=registry:2", "--filter", "publish=5001")
 	out, err := cmd.Output()
 	if err != nil {
 		return
@@ -51,7 +54,7 @@ func StopRegistry(t *testing.T) {
 		id = strings.TrimSpace(id)
 		if id != "" {
 			//nolint:errcheck // best-effort cleanup in tests
-			exec.CommandContext(context.Background(), "docker", "rm", "-f", id).Run()
+			exec.CommandContext(ctx, "docker", "rm", "-f", id).Run()
 		}
 	}
 	WaitPort5001Free(t)
@@ -61,8 +64,10 @@ func StopRegistry(t *testing.T) {
 func WaitPort5001Free(t *testing.T) {
 	t.Helper()
 	dialer := &net.Dialer{Timeout: 200 * time.Millisecond}
+	ctx, cancel := testctx.Background()
+	defer cancel()
 	for range 30 {
-		conn, err := dialer.DialContext(context.Background(), "tcp", "localhost:5001")
+		conn, err := dialer.DialContext(ctx, "tcp", "localhost:5001")
 		if err != nil {
 			return
 		}

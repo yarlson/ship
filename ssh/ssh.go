@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"syscall"
@@ -52,9 +53,9 @@ func commonArgs(keyPath string, port int) []string {
 
 // RunRemoteCommand executes a command on the remote host via SSH.
 // Returns stdout, stderr, exit code, and error.
-func RunRemoteCommand(keyPath string, port int, user, host, cmd string) (stdoutStr, stderrStr string, exitCode int, err error) {
+func RunRemoteCommand(ctx context.Context, keyPath string, port int, user, host, cmd string) (stdoutStr, stderrStr string, exitCode int, err error) {
 	args := BuildRemoteCommandArgs(keyPath, port, user, host, cmd)
-	c := exec.CommandContext(context.Background(), "ssh", args...)
+	c := exec.CommandContext(ctx, "ssh", args...)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	c.Stdout = &stdoutBuf
@@ -85,9 +86,9 @@ func (t *TunnelProcess) Exited() <-chan struct{} {
 
 // StartTunnel starts a reverse SSH tunnel as a background process.
 // Returns a TunnelProcess for lifecycle management.
-func StartTunnel(keyPath string, port int, user, host string) (*TunnelProcess, error) {
+func StartTunnel(ctx context.Context, keyPath string, port int, user, host string) (*TunnelProcess, error) {
 	args := BuildTunnelArgs(keyPath, port, user, host)
-	c := exec.CommandContext(context.Background(), "ssh", args...)
+	c := exec.CommandContext(ctx, "ssh", args...)
 
 	if err := c.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start SSH tunnel: %w", err)
@@ -107,9 +108,12 @@ func StartTunnel(keyPath string, port int, user, host string) (*TunnelProcess, e
 
 // StopTunnel gracefully stops the tunnel process.
 // Sends SIGTERM first, waits with timeout, then SIGKILL if needed.
-func StopTunnel(tp *TunnelProcess) error {
+func StopTunnel(ctx context.Context, tp *TunnelProcess) error {
 	if tp == nil || tp.cmd == nil || tp.cmd.Process == nil {
 		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	// Check if already exited.
@@ -122,17 +126,28 @@ func StopTunnel(tp *TunnelProcess) error {
 	// Send SIGTERM.
 	if err := tp.cmd.Process.Signal(syscall.SIGTERM); err != nil {
 		// Process already exited.
-		return nil //nolint:nilerr // process already exited
+		if errors.Is(err, os.ErrProcessDone) {
+			return nil
+		}
+		return nil
 	}
 
-	// Wait with timeout.
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+
 	select {
 	case <-tp.done:
 		return nil
-	case <-time.After(5 * time.Second):
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
 		// Force kill.
 		_ = tp.cmd.Process.Kill() //nolint:errcheck // best-effort
-		<-tp.done
-		return nil
+		select {
+		case <-tp.done:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }

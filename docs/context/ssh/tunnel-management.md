@@ -8,6 +8,7 @@ The `ssh` module owns:
 - remote command execution
 - reverse tunnel startup
 - reverse tunnel shutdown
+- respecting caller-provided cancellation and deadlines for blocking SSH operations
 
 ## Remote Commands
 
@@ -29,8 +30,9 @@ Optional SSH key and port are included when configured.
 
 ## Lifecycle
 
-- `StartTunnel()` starts the background SSH process
+- `RunRemoteCommand(ctx, ...)` executes one remote command with caller-owned cancellation
+- `StartTunnel(ctx, ...)` starts the background SSH process
 - `TunnelProcess.Exited()` exposes whether the process has exited
-- `StopTunnel()` sends SIGTERM, waits, then SIGKILLs if required
+- `StopTunnel(ctx, ...)` sends SIGTERM, waits, then SIGKILLs if required
 
-The workflow defers cleanup immediately after tunnel establishment.
+The workflow defers cleanup immediately after tunnel establishment and may use a bounded cleanup context so teardown still runs after workflow cancellation.

@@ -9,10 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"ship/cli"
+	"ship/testctx"
 )
 
 func TestCheckDocker_Available(t *testing.T) {
-	cmdErr := checkDocker()
+	cmdErr := checkDocker(testctx.New(t))
 	if cmdErr != nil {
 		t.Skipf("skipping integration test: Docker daemon unavailable: %v", cmdErr)
 	}
@@ -25,7 +26,7 @@ func TestCheckSSH_Available(t *testing.T) {
 }
 
 func TestCheckSSHConnectivity_Unreachable(t *testing.T) {
-	err := checkSSHConnectivity(cli.Config{
+	err := checkSSHConnectivity(testctx.New(t), cli.Config{
 		User:    "root",
 		Host:    "192.0.2.1",
 		KeyPath: "/tmp/nonexistent-key-for-test",
